@@ -6,4 +6,4 @@ firebaseProjectId=your-firebase-project-id
 firebaseSenderId=1234567890
 # Optional: an HTTPS origin you control for the embedded YouTube IFrame player.
 # Leave blank to use the "Open in YouTube" button instead.
-playerOrigin=https://your-site.example
+playerOrigin=
