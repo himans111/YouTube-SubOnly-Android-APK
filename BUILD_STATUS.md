@@ -1,28 +1,30 @@
 # ChannelOnly build status
 
-## Current source state
-The Android project is committed at the repository root. The latest source adds Android Picture-in-Picture support for a configured embedded player and hides the app's navigation chrome while the Activity is in PiP.
+## Latest source and validation
 
-## Latest verified build
+- Android source is committed at the repository root on `main`.
+- Latest feature changes include Android Picture-in-Picture (PiP) eligibility tied to a configured HTTPS embedded-player origin, Android 12+ auto-enter PiP, explicit PiP entry on Android 8–11, and clearing PiP eligibility on YouTube disconnect/sign-out.
+- Hindi setup guide: `SETUP_HINDI.md`.
+- Latest validation run for the newest PiP source: [GitHub Actions run #23](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39646607684). It is currently validating a direct emulator boot/install/start sequence.
 
-- GitHub Actions run: https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39626459638
-- Gradle build: successful
-- Unit tests: successful
-- Debug APK: uploaded as artifact `channelonly-debug-apk` (artifact ID 12356977092; approximately 19.8 MiB)
-- APK ZIP integrity: verified after download; the APK contains 233 ZIP entries.
-- Emulator smoke test: still running on the hosted GitHub Actions runner; its final result has not been confirmed yet.
+## Previous verified build
 
-## Implemented app behaviour
+- Run #22: Gradle unit tests and debug APK build both passed.
+- Its emulator step booted an Android emulator but failed later with an ADB broken-pipe/service error before a stable install-and-launch result was established.
+- APK artifact was uploaded as `channelonly-debug-apk` (artifact ID 12356977092; about 19.8 MiB). The ZIP archive was verified, but this artifact was built before the latest Android 12+ auto-enter and PiP cleanup changes.
+- Earlier emulator runs showed the same ADB instability, not an application compilation failure.
 
-- Firebase Email/Password account screen (requires the user's own Firebase values).
+## App features
+
+- Firebase Email/Password account screen (requires real Firebase project values).
 - Separate Google authorization for the YouTube Data API.
 - Search channels; subscribe/unsubscribe.
-- Feed sourced from the authorized YouTube account's subscriptions, with a client-side subscription-channel ID guard.
-- Embedded YouTube player when a real HTTPS player origin is configured; otherwise an Open in YouTube fallback.
-- Android PiP is requested when leaving the app from an active embedded-player screen. Continuation is subject to Android, YouTube player, device and account rules.
+- Home feed limited to subscribed channel IDs with a client-side channel-ID filter.
+- Embedded YouTube player if a real HTTPS player origin is configured; otherwise an Open in YouTube fallback.
+- PiP is requested only for a configured embedded player. Continuation depends on Android, the YouTube player, device, and account rules.
 
-## Setup and limitations
+## Setup and release limitations
 
-See `SETUP_HINDI.md` for Firebase, OAuth, HTTPS player origin, build, and testing steps. `README.md` includes an English overview.
+See `SETUP_HINDI.md` for Firebase, OAuth, HTTPS player origin, build and testing instructions.
 
-Do not commit `local.properties`, authentication tokens, or passwords. Firebase login and YouTube OAuth require actual project credentials; source compilation alone does not verify these account-dependent flows. The privacy policy under `player-origin-site/privacy.html` remains a draft and must be completed before a public release.
+Do not commit `local.properties`, authentication tokens or passwords. Firebase sign-in and YouTube OAuth require actual project credentials; compilation alone does not verify account-dependent flows. `player-origin-site/privacy.html` is still a draft and must be completed before any public release.
