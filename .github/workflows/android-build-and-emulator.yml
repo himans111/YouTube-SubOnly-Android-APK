@@ -28,36 +28,36 @@ jobs:
             unzip -q "$RUNNER_TEMP/ChannelOnly-source.zip" -d ChannelOnly
 
             # Apply verified compiler fixes to the reconstructed source.
-            python3 - <<'PY'
-from pathlib import Path
-root = Path("ChannelOnly")
-build = root / "build.gradle.kts"
-text = build.read_text()
-text = text.replace('version "2.1.21"', 'version "2.3.0"')
-text = text.replace('version "2.1.21" apply false', 'version "2.3.0" apply false')
-# This project uses the plugins DSL, whose root lines are explicit versions.
-text = text.replace('version "2.1.21"', 'version "2.3.0"')
-text = text.replace('version "2.1.21" apply false', 'version "2.3.0" apply false')
-build.write_text(text)
-
-api = root / "app/src/main/java/com/cube/channelonly/data/YouTubeApi.kt"
-source = api.read_text()
-old = '        all.distinctBy { it.channelId }'
-assert source.count(old) == 1, "expected exactly one subscription list return"
-source = source.replace(old, '        return all.distinctBy { it.channelId }', 1)
-
-start = source.index("    suspend fun searchChannels(")
-end = source.index("    suspend fun subscribe(", start)
-section = source[start:end]
-assert section.count("        buildList {") == 1, "expected one searchChannels builder"
-section = section.replace("        buildList {", "        return buildList {", 1)
-source = source[:start] + section + source[end:]
-
-old = '        filterSubscribedVideos(videos, allowedIds).sortedByDescending { it.publishedAt }'
-assert source.count(old) == 1, "expected exactly one feed result"
-source = source.replace(old, '        return filterSubscribedVideos(videos, allowedIds).sortedByDescending { it.publishedAt }', 1)
-api.write_text(source)
-PY
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("ChannelOnly")
+          build = root / "build.gradle.kts"
+          text = build.read_text()
+          text = text.replace('version "2.1.21"', 'version "2.3.0"')
+          text = text.replace('version "2.1.21" apply false', 'version "2.3.0" apply false')
+          # This project uses the plugins DSL, whose root lines are explicit versions.
+          text = text.replace('version "2.1.21"', 'version "2.3.0"')
+          text = text.replace('version "2.1.21" apply false', 'version "2.3.0" apply false')
+          build.write_text(text)
+          
+          api = root / "app/src/main/java/com/cube/channelonly/data/YouTubeApi.kt"
+          source = api.read_text()
+          old = '        all.distinctBy { it.channelId }'
+          assert source.count(old) == 1, "expected exactly one subscription list return"
+          source = source.replace(old, '        return all.distinctBy { it.channelId }', 1)
+          
+          start = source.index("    suspend fun searchChannels(")
+          end = source.index("    suspend fun subscribe(", start)
+          section = source[start:end]
+          assert section.count("        buildList {") == 1, "expected one searchChannels builder"
+          section = section.replace("        buildList {", "        return buildList {", 1)
+          source = source[:start] + section + source[end:]
+          
+          old = '        filterSubscribedVideos(videos, allowedIds).sortedByDescending { it.publishedAt }'
+          assert source.count(old) == 1, "expected exactly one feed result"
+          source = source.replace(old, '        return filterSubscribedVideos(videos, allowedIds).sortedByDescending { it.publishedAt }', 1)
+          api.write_text(source)
+          PY
             # Publish the repaired source tree at the repository root, leaving the CI workflow intact.
             rsync -a --exclude='.git/' --exclude='.github/' --exclude='local.properties' ChannelOnly/ ./
             git config user.name "github-actions[bot]"
