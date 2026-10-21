@@ -84,10 +84,14 @@ import com.cube.channelonly.data.YTChannel
 import com.cube.channelonly.data.YTVideo
 import com.cube.channelonly.data.YouTubeApi
 import com.cube.channelonly.ui.ChannelOnlyTheme
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.lifecycle.lifecycleScope
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
 import com.google.android.gms.common.api.Scope
@@ -114,6 +118,7 @@ class MainActivity : ComponentActivity() {
     private var playerVisibleForPip = false
     private var inPipMode by mutableStateOf(false)
     private val authorizationClient by lazy { Identity.getAuthorizationClient(this) }
+    private val credentialManager by lazy { CredentialManager.create(this) }
 
     private val authorizationLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
@@ -130,50 +135,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val googleSignInLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode != Activity.RESULT_OK || result.data == null) {
-            googleSigningIn = false
-            googleSignInMessage = if (result.resultCode == Activity.RESULT_CANCELED) {
-                "Google sign-in was cancelled."
-            } else {
-                "Google sign-in did not complete. Please try again."
-            }
-        } else {
-            try {
-                val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-                    .getResult(ApiException::class.java)
-                val idToken = account.idToken
-                if (idToken.isNullOrBlank()) {
-                    googleSigningIn = false
-                    googleSignInMessage = "Google did not return an ID token. Check the Web OAuth client ID and Firebase Google provider setup."
-                } else {
-                    val firebase = auth
-                    if (firebase == null) {
-                        googleSigningIn = false
-                        googleSignInMessage = "Firebase is not configured. Add your real Firebase project values first."
-                    } else {
-                        googleSigningIn = true
-                        googleSignInMessage = ""
-                        val credential = GoogleAuthProvider.getCredential(idToken, null)
-                        firebase.signInWithCredential(credential).addOnCompleteListener { task ->
-                            googleSigningIn = false
-                            googleSignInMessage = if (task.isSuccessful) "" else {
-                                task.exception?.localizedMessage ?: "Firebase Google sign-in failed. Check that Google is enabled in Firebase Authentication."
-                            }
-                        }
-                    }
-                }
-            } catch (e: ApiException) {
-                googleSigningIn = false
-                googleSignInMessage = "Google sign-in failed (code ${e.statusCode}). Check OAuth settings and try again."
-            } catch (e: Exception) {
-                googleSigningIn = false
-                googleSignInMessage = e.localizedMessage ?: "Google sign-in failed. Please try again."
-            }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -300,17 +261,57 @@ class MainActivity : ComponentActivity() {
             googleSignInMessage = "Google login setup needed: add googleWebClientId (Web application OAuth client ID) to local.properties."
             return
         }
-        try {
-            val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestEmail()
-                .requestIdToken(webClientId)
+
+        val googleOption = try {
+            GetSignInWithGoogleOption.Builder()
+                .setServerClientId(webClientId)
                 .build()
-            googleSignInMessage = ""
-            googleSigningIn = true
-            googleSignInLauncher.launch(GoogleSignIn.getClient(this, options).signInIntent)
         } catch (e: Exception) {
-            googleSigningIn = false
-            googleSignInMessage = e.localizedMessage ?: "Could not open Google sign-in."
+            googleSignInMessage = e.localizedMessage ?: "Google sign-in configuration is invalid."
+            return
+        }
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleOption)
+            .build()
+
+        googleSignInMessage = ""
+        googleSigningIn = true
+        lifecycleScope.launch {
+            try {
+                val response = credentialManager.getCredential(
+                    context = this@MainActivity,
+                    request = request
+                )
+                val credential = response.credential
+                if (credential is CustomCredential &&
+                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                ) {
+                    val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                    val firebase = auth
+                    if (firebase == null) {
+                        googleSigningIn = false
+                        googleSignInMessage = "Firebase is not configured. Add your real Firebase project values first."
+                    } else {
+                        val firebaseCredential = GoogleAuthProvider.getCredential(googleCredential.idToken, null)
+                        firebase.signInWithCredential(firebaseCredential).addOnCompleteListener { task ->
+                            googleSigningIn = false
+                            googleSignInMessage = if (task.isSuccessful) "" else {
+                                task.exception?.localizedMessage
+                                    ?: "Firebase Google sign-in failed. Check that Google is enabled in Firebase Authentication."
+                            }
+                        }
+                    }
+                } else {
+                    googleSigningIn = false
+                    googleSignInMessage = "Google returned an unsupported sign-in credential. Please try again."
+                }
+            } catch (e: GetCredentialException) {
+                googleSigningIn = false
+                googleSignInMessage = e.localizedMessage ?: "Google sign-in was cancelled or no Google account is available."
+            } catch (e: Exception) {
+                googleSigningIn = false
+                googleSignInMessage = e.localizedMessage ?: "Google sign-in failed. Please try again."
+            }
         }
     }
 
