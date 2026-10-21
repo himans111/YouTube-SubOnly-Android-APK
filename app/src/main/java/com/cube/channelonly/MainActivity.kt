@@ -178,6 +178,8 @@ class MainActivity : ComponentActivity() {
                 host != "example.com" &&
                 !host.endsWith(".example") &&
                 !host.startsWith("your-site") &&
+                !host.startsWith("your-real-domain") &&
+                !host.startsWith("replace-me") &&
                 (uri.path.isNullOrBlank() || uri.path == "/") &&
                 uri.query.isNullOrBlank() &&
                 uri.fragment.isNullOrBlank()
