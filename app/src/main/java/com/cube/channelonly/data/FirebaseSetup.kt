@@ -7,10 +7,21 @@ import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 
 object FirebaseSetup {
-    fun isConfigured(): Boolean =
-        BuildConfig.FIREBASE_API_KEY.isNotBlank() &&
-            BuildConfig.FIREBASE_APP_ID.isNotBlank() &&
-            BuildConfig.FIREBASE_PROJECT_ID.isNotBlank()
+    fun isConfigured(): Boolean {
+        val apiKey = BuildConfig.FIREBASE_API_KEY.trim()
+        val appId = BuildConfig.FIREBASE_APP_ID.trim()
+        val projectId = BuildConfig.FIREBASE_PROJECT_ID.trim()
+
+        // Non-empty sample placeholders must not be mistaken for real Firebase credentials.
+        return apiKey.isNotBlank() &&
+            !apiKey.contains("YOUR_", ignoreCase = true) &&
+            appId.isNotBlank() &&
+            !appId.contains("YOUR_", ignoreCase = true) &&
+            !appId.startsWith("1:1234567890:") &&
+            projectId.isNotBlank() &&
+            !projectId.contains("YOUR_", ignoreCase = true) &&
+            !projectId.startsWith("your-", ignoreCase = true)
+    }
 
     fun initialize(context: Context): FirebaseAuth? {
         if (!isConfigured()) return null
