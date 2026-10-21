@@ -11,3 +11,4 @@ Move artifact upload ahead of emulator so debug APK is retained even if smoke-te
 Add Android PiP support to embedded player and run Gradle/unit-test/emulator validation.
 Retry emulator smoke test on Android API 30 with a longer boot timeout after PiP changes.
 Improve Android 12+ PiP gesture transition using setAutoEnterEnabled; validate build/tests and emulator startup.
+Restart from current committed PiP source. Re-run unit tests/APK build, then use the direct Android emulator boot and launch script to diagnose the previous ADB broken-pipe failure.
