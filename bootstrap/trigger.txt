@@ -19,3 +19,5 @@ Extend subscribed-feed coverage beyond the first 50 channels; bound playlist req
 Add explicit per-command ADB timeouts because adb shell can hang inside the emulator boot wait loop. Re-run validation.
 
 Detect whether /dev/kvm is usable; opt into x86_64 software emulation when KVM is missing; allow up to 20 minutes for first boot.
+
+Try granting the ephemeral hosted runner account access to /dev/kvm via setfacl/chmod before falling back to opt-in software CPU emulation.
