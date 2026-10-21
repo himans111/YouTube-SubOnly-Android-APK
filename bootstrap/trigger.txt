@@ -33,3 +33,5 @@ Use the current Android Credential Manager API for the explicit Continue with Go
 Polish login card elevation, compact spacing, and Google button contrast; run full compile/tests, emulator launch, and refresh the login-screen screenshot from the latest source.
 
 Fix the Credential Manager GetSignInWithGoogleOption constructor to pass the Web client ID at construction, then verify build/tests/emulator and capture the polished login screenshot.
+
+Polish the ChannelOnly sign-in card: brand title, email/password placeholders, clear Log in action, and Continue with Google as the second method. Rebuild, run unit tests, install/launch on emulator, and capture the latest login screenshot.
