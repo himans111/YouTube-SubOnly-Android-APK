@@ -15,3 +15,5 @@ Restart from current committed PiP source. Re-run unit tests/APK build, then use
 Add fail-fast emulator process checks and boot-time diagnostics; run build/unit tests and emulator smoke test again.
 
 Extend subscribed-feed coverage beyond the first 50 channels; bound playlist request concurrency and surface quota/auth failures. Build and retest.
+
+Add explicit per-command ADB timeouts because adb shell can hang inside the emulator boot wait loop. Re-run validation.
