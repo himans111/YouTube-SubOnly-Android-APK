@@ -31,3 +31,5 @@ Redesign sign-in UI to offer Firebase email/password and Continue with Google, a
 Use the current Android Credential Manager API for the explicit Continue with Google button (Google ID token to Firebase Auth), retain email/password login, and rebuild/test the redesigned screen with emulator screenshot capture.
 
 Polish login card elevation, compact spacing, and Google button contrast; run full compile/tests, emulator launch, and refresh the login-screen screenshot from the latest source.
+
+Fix the Credential Manager GetSignInWithGoogleOption constructor to pass the Web client ID at construction, then verify build/tests/emulator and capture the polished login screenshot.
