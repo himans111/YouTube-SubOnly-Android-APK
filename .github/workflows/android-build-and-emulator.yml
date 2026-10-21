@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-test-and-smoke:
@@ -17,60 +17,8 @@ jobs:
       - name: Check out project
         uses: actions/checkout@v4
 
-      - name: Reconstruct source ZIP from upload chunks
-        shell: bash
-        run: |
-          set -euo pipefail
-          if compgen -G 'bootstrap/source-*.b64' > /dev/null; then
-            cat bootstrap/source-*.b64 | tr -d '\r\n' | base64 --decode > "$RUNNER_TEMP/ChannelOnly-source.zip"
-            unzip -t "$RUNNER_TEMP/ChannelOnly-source.zip"
-            mkdir -p ChannelOnly
-            unzip -q "$RUNNER_TEMP/ChannelOnly-source.zip" -d ChannelOnly
-
-            # Apply verified compiler fixes to the reconstructed source.
-          python3 - <<'PY'
-          from pathlib import Path
-          root = Path("ChannelOnly")
-          build = root / "build.gradle.kts"
-          text = build.read_text()
-          text = text.replace('version "2.1.21"', 'version "2.3.0"')
-          text = text.replace('version "2.1.21" apply false', 'version "2.3.0" apply false')
-          # This project uses the plugins DSL, whose root lines are explicit versions.
-          text = text.replace('version "2.1.21"', 'version "2.3.0"')
-          text = text.replace('version "2.1.21" apply false', 'version "2.3.0" apply false')
-          build.write_text(text)
-          
-          api = root / "app/src/main/java/com/cube/channelonly/data/YouTubeApi.kt"
-          source = api.read_text()
-          old = '        all.distinctBy { it.channelId }'
-          assert source.count(old) == 1, "expected exactly one subscription list return"
-          source = source.replace(old, '        return all.distinctBy { it.channelId }', 1)
-          
-          start = source.index("    suspend fun searchChannels(")
-          end = source.index("    suspend fun subscribe(", start)
-          section = source[start:end]
-          assert section.count("        buildList {") == 1, "expected one searchChannels builder"
-          section = section.replace("        buildList {", "        return buildList {", 1)
-          source = source[:start] + section + source[end:]
-          
-          old = '        filterSubscribedVideos(videos, allowedIds).sortedByDescending { it.publishedAt }'
-          assert source.count(old) == 1, "expected exactly one feed result"
-          source = source.replace(old, '        return filterSubscribedVideos(videos, allowedIds).sortedByDescending { it.publishedAt }', 1)
-          api.write_text(source)
-          PY
-            # Publish the repaired source tree at the repository root, leaving the CI workflow intact.
-            rsync -a --exclude='.git/' --exclude='.github/' --exclude='local.properties' ChannelOnly/ ./
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A -- app build.gradle.kts settings.gradle.kts gradle.properties gradlew gradlew.bat .gitignore local.properties.example player-origin-site
-            if ! git diff --cached --quiet; then
-              git commit -m "Add ChannelOnly source and fix Kotlin compilation"
-              git push origin HEAD:main
-            fi
-            echo "PROJECT_DIR=ChannelOnly" >> "$GITHUB_ENV"
-          else
-            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
-          fi
+      - name: Use committed project sources
+        run: echo "PROJECT_DIR=." >> "$GITHUB_ENV"
 
       - name: Verify Android source is present
         shell: bash
