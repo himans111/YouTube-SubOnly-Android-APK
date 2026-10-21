@@ -76,23 +76,59 @@ jobs:
           SDK_ROOT="$ANDROID_SDK_ROOT"
           mkdir -p "$ANDROID_AVD_HOME"
           export ANDROID_AVD_HOME
-          printf 'no\n' | "$SDK_ROOT/cmdline-tools/$(find "$SDK_ROOT/cmdline-tools" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)/bin/avdmanager" create avd --force --name channelonly_ci --package "system-images;android-30;google_apis;x86_64" --device pixel_2
+          AVDMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)"
+          test -x "$AVDMANAGER" || { echo "::error::avdmanager executable not found"; exit 1; }
+          printf 'no\n' | "$AVDMANAGER" create avd --force --name channelonly_ci --package "system-images;android-30;google_apis;x86_64" --device pixel_2
           nohup "$SDK_ROOT/emulator/emulator" -avd channelonly_ci -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -camera-back none > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/emulator.pid"
+          EMULATOR_PID=$!
+          echo "$EMULATOR_PID" > "$RUNNER_TEMP/emulator.pid"
           export ANDROID_SERIAL=emulator-5554
           adb start-server
-          deadline=$((SECONDS + 900))
+
+          dump_diagnostics() {
+            echo "---- emulator process ----"
+            ps -fp "$EMULATOR_PID" || true
+            echo "---- emulator output ----"
+            cat "$RUNNER_TEMP/emulator.log" || true
+            echo "---- adb devices ----"
+            adb devices -l || true
+            adb -s "$ANDROID_SERIAL" shell getprop > "$RUNNER_TEMP/boot-properties.txt" 2>&1 || true
+            adb -s "$ANDROID_SERIAL" logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
+          }
+
+          deadline=$((SECONDS + 600))
           until adb -s "$ANDROID_SERIAL" get-state >/dev/null 2>&1; do
-            if (( SECONDS >= deadline )); then cat "$RUNNER_TEMP/emulator.log"; echo "::error::ADB device did not become available"; exit 1; fi
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              dump_diagnostics
+              echo "::error::Android emulator process exited before ADB became available"
+              exit 1
+            fi
+            if (( SECONDS >= deadline )); then
+              dump_diagnostics
+              echo "::error::ADB device did not become available within 10 minutes"
+              exit 1
+            fi
             sleep 5
           done
+
           until [ "$(adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do
-            if (( SECONDS >= deadline )); then cat "$RUNNER_TEMP/emulator.log"; adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed || true; echo "::error::Emulator did not complete boot"; exit 1; fi
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              dump_diagnostics
+              echo "::error::Android emulator process exited before boot completed"
+              exit 1
+            fi
+            if (( SECONDS >= deadline )); then
+              dump_diagnostics
+              echo "::error::Emulator did not complete boot within 10 minutes"
+              exit 1
+            fi
             sleep 5
           done
+
           adb -s "$ANDROID_SERIAL" shell settings put global window_animation_scale 0 || true
           adb -s "$ANDROID_SERIAL" shell settings put global transition_animation_scale 0 || true
           adb -s "$ANDROID_SERIAL" shell settings put global animator_duration_scale 0 || true
+          echo "Emulator boot completed."
 
       - name: Install, launch, and inspect app in emulator
         shell: bash
@@ -128,6 +164,8 @@ jobs:
           name: channelonly-emulator-diagnostics
           path: |
             ${{ runner.temp }}/emulator.log
+            ${{ runner.temp }}/emulator.pid
+            ${{ runner.temp }}/boot-properties.txt
             ${{ runner.temp }}/logcat.txt
           if-no-files-found: ignore
           retention-days: 7
