@@ -6,3 +6,4 @@ Fix YAML indentation for CI source patch and rerun build.
 Build directly from committed source with Kotlin compilerOptions fix.
 Remove duplicate Java MainActivity and retry compile/emulator test.
 Use valid pixel_2 AVD profile and retry emulator smoke test.
+Fix emulator smoke-test shell condition and use non-blocking Activity launch.
