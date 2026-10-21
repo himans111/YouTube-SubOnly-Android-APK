@@ -17,3 +17,5 @@ Add fail-fast emulator process checks and boot-time diagnostics; run build/unit 
 Extend subscribed-feed coverage beyond the first 50 channels; bound playlist request concurrency and surface quota/auth failures. Build and retest.
 
 Add explicit per-command ADB timeouts because adb shell can hang inside the emulator boot wait loop. Re-run validation.
+
+Detect whether /dev/kvm is usable; opt into x86_64 software emulation when KVM is missing; allow up to 20 minutes for first boot.
