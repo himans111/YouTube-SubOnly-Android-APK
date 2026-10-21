@@ -2,3 +2,4 @@ All 10 source archive chunks have been committed and verified to total 29,900 ba
 SDK setup fix committed; rerun build and emulator smoke test.
 Fix SDK license pipeline and retry CI.
 Apply Kotlin return fixes and align Kotlin compiler with Firebase Auth metadata; retry CI.
+Fix YAML indentation for CI source patch and rerun build.
