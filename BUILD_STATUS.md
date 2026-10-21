@@ -12,9 +12,11 @@
 
 - Previous verified build: [GitHub Actions run #23](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39646607684). Unit tests and debug APK assembly succeeded, and artifact `channelonly-debug-apk` was uploaded.
 - The run #23 APK was checked as a valid Android package. Its SHA-256 is `299f2f5e8b8858d6d6d3e355d884af3536ce49f28677323434e19a5687fe0d0b`. This artifact predates the more recent subscribed-feed improvement, so use a newer CI artifact for that change.
-- [Run #24](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39648481524) and [run #25](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39648722920) are retries created while diagnosing the emulator wait. Their emulator boot steps have not yet been confirmed successful.
-- [Run #26](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39649062356) uses the latest source and workflow with explicit timeouts on ADB operations, faster detection of an exited emulator process, and boot diagnostics. At the last status check, Android SDK package setup was in progress; no emulator pass is claimed.
-- The earlier stall likely occurs because an ADB shell command can hang inside a boot-loop condition before the elapsed-time check executes. Run #26 now puts a timeout around those commands and should either proceed to app launch or return diagnostics rather than wait forever.
+- [Run #23](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39646607684) completed with a failure in emulator startup. Its logs gave the specific cause: the x86_64 emulator requires hardware acceleration, but the hosted runner's user cannot access `/dev/kvm`. The APK build and unit tests had succeeded.
+- [Run #24](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39648481524) and [run #25](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39648722920) use a workflow revision that still lacks the final per-command ADB timeouts and may remain stuck in the emulator boot step.
+- [Run #26](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39649062356) also failed fast with the same KVM limitation, confirming the actual failure mode.
+- [Run #27](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39649374960) is queued with the latest source, per-command ADB timeouts, a 20-minute boot window, and an opt-in software-emulation fallback (`ANDROID_I_WANT_MY_TCG=yes` plus `-accel off`) for runners without KVM. No emulator pass is claimed yet.
+- Google's emulator documentation says `-accel off` is an explicitly opt-in, very slow software mode requiring `ANDROID_I_WANT_MY_TCG=yes`; the workflow now configures that branch when KVM is unavailable.
 
 ## Implemented behavior
 
