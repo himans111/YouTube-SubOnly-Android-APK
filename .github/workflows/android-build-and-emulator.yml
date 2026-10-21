@@ -79,7 +79,16 @@ jobs:
           AVDMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)"
           test -x "$AVDMANAGER" || { echo "::error::avdmanager executable not found"; exit 1; }
           printf 'no\n' | "$AVDMANAGER" create avd --force --name channelonly_ci --package "system-images;android-30;google_apis;x86_64" --device pixel_2
-          nohup "$SDK_ROOT/emulator/emulator" -avd channelonly_ci -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -camera-back none > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          if [ -c /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+            EMULATOR_ACCEL_ARGS=(-accel on)
+            echo "KVM is available; using hardware-accelerated x86_64 emulation."
+          else
+            # Android Emulator requires this opt-in to run the x86_64 guest without KVM.
+            export ANDROID_I_WANT_MY_TCG=yes
+            EMULATOR_ACCEL_ARGS=(-accel off)
+            echo "::warning::KVM is unavailable; using very slow software CPU emulation."
+          fi
+          nohup "$SDK_ROOT/emulator/emulator" -avd channelonly_ci "${EMULATOR_ACCEL_ARGS[@]}" -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -camera-back none > "$RUNNER_TEMP/emulator.log" 2>&1 &
           EMULATOR_PID=$!
           echo "$EMULATOR_PID" > "$RUNNER_TEMP/emulator.pid"
           export ANDROID_SERIAL=emulator-5554
@@ -96,7 +105,7 @@ jobs:
             timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
           }
 
-          deadline=$((SECONDS + 600))
+          deadline=$((SECONDS + 1200))
           until timeout 10s adb -s "$ANDROID_SERIAL" get-state >/dev/null 2>&1; do
             if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
               dump_diagnostics
