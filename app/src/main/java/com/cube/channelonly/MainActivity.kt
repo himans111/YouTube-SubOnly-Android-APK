@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.util.Rational
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -151,11 +152,7 @@ class MainActivity : ComponentActivity() {
                         onConnectYoutube = { requestYoutubeAccess() },
                         onDisconnectYoutube = { disconnectYoutube() },
                         inPipMode = inPipMode,
-                        onPlayerVisibilityChanged = { visible ->
-                            playerVisibleForPip = visible &&
-                                BuildConfig.PLAYER_ORIGIN.trim().startsWith("https://") &&
-                                !BuildConfig.PLAYER_ORIGIN.contains("example.com")
-                        },
+                        onPlayerVisibilityChanged = { visible -> updatePipEligibility(visible) },
                         onSignOut = {
                             auth?.signOut()
                             youtubeToken = null
@@ -167,9 +164,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun updatePipEligibility(visible: Boolean) {
+        val canEnterPip = visible &&
+            BuildConfig.PLAYER_ORIGIN.trim().startsWith("https://") &&
+            !BuildConfig.PLAYER_ORIGIN.contains("example.com")
+        playerVisibleForPip = canEnterPip
+
+        // Android 12+ recommends enabling auto-enter early for smoother gesture-navigation PiP.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+                .setAutoEnterEnabled(canEnterPip)
+                .build()
+            setPictureInPictureParams(params)
+        }
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (playerVisibleForPip && !inPipMode) {
+        // Android 8–11 need an explicit call. On Android 12+ the current params enable auto-enter.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && playerVisibleForPip && !inPipMode) {
             try {
                 val params = PictureInPictureParams.Builder()
                     .setAspectRatio(Rational(16, 9))
