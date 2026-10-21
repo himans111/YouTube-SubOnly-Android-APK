@@ -150,10 +150,14 @@ class MainActivity : ComponentActivity() {
                         token = youtubeToken,
                         connectionMessage = youtubeConnectionMessage,
                         onConnectYoutube = { requestYoutubeAccess() },
-                        onDisconnectYoutube = { disconnectYoutube() },
+                        onDisconnectYoutube = {
+                            updatePipEligibility(false)
+                            disconnectYoutube()
+                        },
                         inPipMode = inPipMode,
                         onPlayerVisibilityChanged = { visible -> updatePipEligibility(visible) },
                         onSignOut = {
+                            updatePipEligibility(false)
                             auth?.signOut()
                             youtubeToken = null
                             youtubeConnectionMessage = "YouTube not connected"
