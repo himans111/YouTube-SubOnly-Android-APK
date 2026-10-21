@@ -1,6 +1,9 @@
 package com.cube.channelonly.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -12,6 +15,12 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 private const val API_HOST = "www.googleapis.com"
+
+internal class YouTubeApiException(
+    val statusCode: Int,
+    val reason: String?,
+    message: String
+) : IOException(message)
 
 /** YouTube Data API client. All calls are authenticated with the current user's OAuth access token. */
 class YouTubeApi {
@@ -49,11 +58,17 @@ class YouTubeApi {
         client.newCall(builder.build()).execute().use { response ->
             val responseText = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                val apiMessage = try {
-                    JSONObject(responseText).getJSONObject("error").optString("message")
-                } catch (_: Exception) { "" }
+                val error = try {
+                    JSONObject(responseText).optJSONObject("error")
+                } catch (_: Exception) { null }
+                val apiMessage = error?.optString("message").orEmpty()
+                val reason = error?.optJSONArray("errors")?.optJSONObject(0)?.optString("reason")
                 val detail = if (apiMessage.isNotBlank()) apiMessage else "HTTP ${response.code}"
-                throw IOException("YouTube API error: $detail. Check permissions, API enablement, and quota.")
+                throw YouTubeApiException(
+                    statusCode = response.code,
+                    reason = reason,
+                    message = "YouTube API error: $detail. Check permissions, API enablement, and quota."
+                )
             }
             if (responseText.isBlank()) JSONObject() else JSONObject(responseText)
         }
@@ -137,7 +152,7 @@ class YouTubeApi {
 
     /** Loads a limited recent-upload feed from subscribed channels only; never runs a global video search. */
     suspend fun loadSubscribedFeed(token: String, subscriptions: List<YTChannel>): List<YTVideo> {
-        val selected = subscriptions.take(50)
+        val selected = subscriptions.distinctBy { it.channelId }
         if (selected.isEmpty()) return emptyList()
 
         val uploadsByChannel = mutableMapOf<String, String>()
@@ -159,36 +174,51 @@ class YouTubeApi {
 
         val allowedIds = selected.map { it.channelId }.toSet()
         val channelTitles = selected.associate { it.channelId to it.title }
-        val videos = mutableListOf<YTVideo>()
-        for ((channelId, uploadsPlaylistId) in uploadsByChannel) {
-            try {
-                val json = request(
-                    token,
-                    "playlistItems",
-                    listOf("part" to "snippet,contentDetails", "playlistId" to uploadsPlaylistId, "maxResults" to "5")
-                )
-                val items = json.optJSONArray("items") ?: continue
-                for (i in 0 until items.length()) {
-                    val item = items.optJSONObject(i) ?: continue
-                    val snippet = item.optJSONObject("snippet") ?: continue
-                    val actualChannel = snippet.optString("channelId", channelId)
-                    val videoId = item.optJSONObject("contentDetails")?.optString("videoId")
-                        ?: snippet.optJSONObject("resourceId")?.optString("videoId").orEmpty()
-                    if (videoId.isBlank() || actualChannel !in allowedIds) continue
-                    videos += YTVideo(
-                        videoId = videoId,
-                        title = snippet.optString("title", "YouTube video"),
-                        channelId = actualChannel,
-                        channelTitle = snippet.optString("channelTitle", channelTitles[actualChannel] ?: "Subscribed channel"),
-                        thumbnailUrl = bestThumbnail(snippet.optJSONObject("thumbnails")),
-                        publishedAt = snippet.optString("publishedAt", "")
-                    )
-                }
-            } catch (e: IOException) {
-                // A single unavailable channel should not break the rest of the subscription feed.
+
+        // A modest concurrency limit makes large subscription lists faster without flooding the API.
+        val videoBatches = uploadsByChannel.entries.toList().chunked(5).map { batch ->
+            coroutineScope {
+                batch.map { entry ->
+                    async {
+                        val channelId = entry.key
+                        val uploadsPlaylistId = entry.value
+                        try {
+                            val json = request(
+                                token,
+                                "playlistItems",
+                                listOf("part" to "snippet,contentDetails", "playlistId" to uploadsPlaylistId, "maxResults" to "5")
+                            )
+                            val items = json.optJSONArray("items") ?: return@async emptyList<YTVideo>()
+                            buildList {
+                                for (i in 0 until items.length()) {
+                                    val item = items.optJSONObject(i) ?: continue
+                                    val snippet = item.optJSONObject("snippet") ?: continue
+                                    val actualChannel = snippet.optString("channelId", channelId)
+                                    val videoId = item.optJSONObject("contentDetails")?.optString("videoId").orEmpty()
+                                        .ifBlank { snippet.optJSONObject("resourceId")?.optString("videoId").orEmpty() }
+                                    if (videoId.isBlank() || actualChannel !in allowedIds) continue
+                                    add(
+                                        YTVideo(
+                                            videoId = videoId,
+                                            title = snippet.optString("title", "YouTube video"),
+                                            channelId = actualChannel,
+                                            channelTitle = snippet.optString("channelTitle", channelTitles[actualChannel] ?: "Subscribed channel"),
+                                            thumbnailUrl = bestThumbnail(snippet.optJSONObject("thumbnails")),
+                                            publishedAt = snippet.optString("publishedAt", "")
+                                        )
+                                    )
+                                }
+                            }
+                        } catch (e: YouTubeApiException) {
+                            // Skip deleted/unavailable playlists, but surface auth, quota, and other API failures.
+                            if (e.statusCode == 404) emptyList() else throw e
+                        }
+                    }
+                }.awaitAll()
             }
-        }
-        return filterSubscribedVideos(videos, allowedIds).sortedByDescending { it.publishedAt }
+        }.flatten()
+
+        return filterSubscribedVideos(videoBatches.flatten(), allowedIds).sortedByDescending { it.publishedAt }
     }
 
     private fun bestThumbnail(thumbnails: JSONObject?): String {
