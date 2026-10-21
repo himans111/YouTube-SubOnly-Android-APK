@@ -171,6 +171,26 @@ jobs:
           fi
           echo "Emulator smoke test passed; app process PID: $PID"
 
+      - name: Capture login-screen screenshot
+        if: success()
+        shell: bash
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          set -euo pipefail
+          timeout 15s adb -s "$ANDROID_SERIAL" exec-out screencap -p > "$RUNNER_TEMP/channelonly-login.png"
+          test -s "$RUNNER_TEMP/channelonly-login.png"
+          file "$RUNNER_TEMP/channelonly-login.png"
+
+      - name: Upload login-screen screenshot
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-login-screen
+          path: ${{ runner.temp }}/channelonly-login.png
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload emulator diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
