@@ -8,27 +8,28 @@
 2. Android package name बिल्कुल यह रखें: com.cube.channelonly
 3. Firebase Authentication → Sign-in method में Email/Password enable करें।
 4. Project settings → General → Your apps से API key, App ID, Project ID और Project number/Sender ID लें।
-5. Android project root में local.properties खोलें। अगर उसमें sdk.dir पहले से है, तो उसे हटाएँ नहीं। local.properties.example के placeholder values को अपनी Firebase values से बदलें। उदाहरण:
+6. Android project root में local.properties खोलें। अगर उसमें sdk.dir पहले से है, तो उसे हटाएँ नहीं। local.properties.example के placeholder values को अपनी Firebase values से बदलें। उदाहरण:
 
         firebaseApiKey=YOUR_REAL_FIREBASE_WEB_API_KEY
         firebaseAppId=1:YOUR_SENDER_ID:android:YOUR_REAL_APP_ID
         firebaseProjectId=YOUR_FIREBASE_PROJECT_ID
         firebaseSenderId=YOUR_SENDER_ID
+        googleWebClientId=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
         playerOrigin=
 
    Placeholder text को जस का तस छोड़ने पर login configure नहीं होगा।
-6. App rebuild/install करें और नया account बनाकर sign-in, sign-out तथा password reset जाँचें।
+7. App rebuild/install करें और नया account बनाकर email sign-in, Google sign-in, sign-out तथा password reset जाँचें।
 
 ## 2. YouTube API और Google authorization
 
 1. Google Cloud Console में intended project खोलें और YouTube Data API v3 enable करें।
-2. OAuth consent screen / Google Auth setup पूरा करें। अगर app testing mode में है, तो अपने Google account को test user के रूप में जोड़ना आवश्यक हो सकता है।
-3. Android OAuth client बनाएँ जिसमें package name com.cube.channelonly और सही debug-signing SHA-1 हो। SHA-1 निकालने के लिए project root में चलाएँ:
+2. Google Cloud → APIs & Services → Credentials में **OAuth 2.0 Client ID → Web application** बनाएं। उसका Client ID `googleWebClientId` में डालें। यह **Web client ID** है, Android client ID नहीं। अगर consent screen testing mode में है, तो अपने Google account को test user के रूप में जोड़ें।
+3. अलग से Android OAuth client बनाएँ जिसमें package name `com.cube.channelonly` और सही debug-signing SHA-1 हो। SHA-1 निकालने के लिए project root में चलाएँ:
 
         ./gradlew signingReport
 
    अगर checkout में Gradle wrapper उपलब्ध न हो, तो installed Gradle से gradle signingReport चलाएँ या Android Studio के Gradle task panel में signingReport चुनें।
-4. App में पहले Firebase email/password से sign-in करें; फिर Connect YouTube with Google दबाएँ और माँगी गई YouTube permission स्वीकार करें। App में अपना Google password कभी न लिखें।
+4. Login स्क्रीन पर email/password या **Continue with Google** में से किसी एक से ChannelOnly account में sign-in करें। Google sign-in के लिए Firebase Google provider enabled और `googleWebClientId` सही होना चाहिए। इसके बाद Connect YouTube with Google दबाएँ और YouTube permission स्वीकार करें। App में अपना Google password कभी न लिखें।
 5. Home feed, channel search और subscribe/unsubscribe को वास्तविक account के साथ जाँचें। API quota, Google consent और account-level restrictions की वजह से requests फिर भी fail हो सकती हैं।
 
 ## 3. Embedded player और Picture-in-Picture (PiP)
