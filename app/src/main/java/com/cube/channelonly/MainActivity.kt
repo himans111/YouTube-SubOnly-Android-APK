@@ -264,8 +264,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val googleOption = try {
-            GetSignInWithGoogleOption.Builder()
-                .setServerClientId(webClientId)
+            GetSignInWithGoogleOption.Builder(webClientId)
                 .build()
         } catch (e: Exception) {
             googleSignInMessage = e.localizedMessage ?: "Google sign-in configuration is invalid."
