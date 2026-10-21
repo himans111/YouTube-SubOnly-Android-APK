@@ -3,13 +3,13 @@
 ## Latest validated build
 
 - Repository: https://github.com/himans111/YouTube-SubOnly-Android-APK
-- Latest completed full validation: [GitHub Actions run #36](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39670930342), source commit `087c7f7fab84c1e2dd80982d6f5deeb6f70a0de9`.
-- Passed: source validation, Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, activity launch, app-process/crash-log inspection, and login-screen screenshot capture/upload.
-- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12380605307`; extracted APK is 20,522,376 bytes with SHA-256 `223692cf24abfe6a7cd4e7e9b12a9695deb5377161f86ca7fc4fb4d01a309f70`.
-- Latest emulator login screenshot artifact: `channelonly-login-screen`, artifact ID `12380595511`.
-- Login screen now offers Firebase email/password sign-in, password reset, account creation, and Google sign-in using Android Credential Manager with Firebase ID-token authentication. YouTube Data API authorization remains a separate post-login flow.
-- Recent hardening rejects placeholder Firebase credentials and placeholder HTTPS player origins for PiP; the example config keeps `playerOrigin` blank by default.
-- Hosted emulator smoke test proves only that the app installs and launches and that its login screen can be captured. It does not verify live Firebase authentication, real Google OAuth, YouTube API behavior, embedded playback, or PiP on a physical device.
+- Latest completed full validation: [GitHub Actions run #37](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39675359818), source commit `aef35c6d8a16f2309e677b15d7604260ad43d0f5`.
+- Passed: Gradle unit tests, debug APK assembly, emulator boot, APK install/launch, app-process/crash-log inspection, and login-screen screenshot capture/upload.
+- Run #37 APK artifact: `channelonly-debug-apk`, artifact ID `12381432072`; extracted APK SHA-256 `46fdf1489386a2bb93bcc58d0a022e180f0105c2402c0a8191433d7e126268f3`.
+- Login screen provides Firebase email/password login, password reset, account creation, and a separate Continue with Google action using Android Credential Manager and Firebase ID-token authentication.
+- After visually inspecting the emulator screenshot, a follow-up compact-layout change was committed in `MainActivity.kt` to reduce header size and shorten setup/help copy so more of the login screen fits on a typical phone. Its validation is running in [GitHub Actions run #38](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39675925429); do not mark that latest layout as validated until run #38 completes.
+- The emulator checks installation and launch only. Neither run proves live Firebase authentication, Google OAuth, YouTube API access, embedded playback, or PiP on a physical device.
+- The current CI APK is a debug build. Real Firebase project values, a valid Web OAuth client ID, Google Cloud consent/testing setup, and an HTTPS player origin for embedded playback/PiP are still required.
 
 ## Application logic improvements
 
