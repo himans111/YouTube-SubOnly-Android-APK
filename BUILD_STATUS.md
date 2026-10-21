@@ -3,11 +3,10 @@
 ## Latest validated build
 
 - Repository: https://github.com/himans111/YouTube-SubOnly-Android-APK
-- Latest completed full validation: [GitHub Actions run #31](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39663981527), source commit `b3382bae80847a9b33dc0b35dcb4e1f6974d3ea5`.
+- Latest completed full validation: [GitHub Actions run #32](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39664156806), source commit `acb485244a4b5c521191a56962851914167240b0`.
 - Passed: source validation, Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, activity launch, and app-process/crash-log inspection.
-- Run #31 APK artifact: `channelonly-debug-apk`, artifact ID `12377106082`; extracted APK is 20,488,707 bytes and SHA-256 `6d3a5a1ab2656adb85ae4d923a93f966be7600c363a718911e425f5d2b1d4910`.
-- Additional source hardening committed after run #31: PiP now rejects placeholder HTTPS origins, the example `local.properties` leaves `playerOrigin` blank by default, and Firebase setup rejects non-empty sample placeholder values instead of enabling a misleading login screen.
-- Latest combined validation is [GitHub Actions run #32](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39664156806), commit `acb485244a4b5c521191a56962851914167240b0`. At the last check, Gradle unit tests/build were still running; do not treat the latest Firebase-guard change as validated until this run completes.
+- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12376716395`; extracted APK is 20,488,707 bytes and SHA-256 `0f7e51c578c9c5ff3b2c1751f37135a51d9e2399ccb6555f88562a147a0df389`.
+- Recent hardening included rejecting placeholder HTTPS player origins for PiP, leaving optional `playerOrigin` blank in the example config, and rejecting non-empty sample Firebase credentials rather than enabling a misleading login screen.
 - Hosted emulator smoke test proves only that the app installs and launches. It does not verify live Firebase login, Google OAuth, YouTube API behavior, embedded playback, or PiP on a physical device.
 
 ## Application logic improvements
