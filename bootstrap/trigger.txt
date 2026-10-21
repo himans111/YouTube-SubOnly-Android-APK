@@ -8,3 +8,4 @@ Remove duplicate Java MainActivity and retry compile/emulator test.
 Use valid pixel_2 AVD profile and retry emulator smoke test.
 Fix emulator smoke-test shell condition and use non-blocking Activity launch.
 Move artifact upload ahead of emulator so debug APK is retained even if smoke-test fails.
+Add Android PiP support to embedded player and run Gradle/unit-test/emulator validation.
