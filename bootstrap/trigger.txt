@@ -23,3 +23,5 @@ Detect whether /dev/kvm is usable; opt into x86_64 software emulation when KVM i
 Try granting the ephemeral hosted runner account access to /dev/kvm via setfacl/chmod before falling back to opt-in software CPU emulation.
 
 Reject placeholder HTTPS player origins so copied sample configuration cannot incorrectly enable PiP; rerun unit tests, debug APK build, and Android emulator launch smoke test.
+
+Reject placeholder Firebase credentials as unconfigured; validate the combined PiP-origin and Firebase placeholder fixes with unit tests, APK build, and emulator smoke test.
