@@ -83,7 +83,7 @@ jobs:
           EMULATOR_PID=$!
           echo "$EMULATOR_PID" > "$RUNNER_TEMP/emulator.pid"
           export ANDROID_SERIAL=emulator-5554
-          adb start-server
+          timeout 20s adb start-server || { cat "$RUNNER_TEMP/emulator.log" || true; echo "::error::ADB server did not start within 20 seconds"; exit 1; }
 
           dump_diagnostics() {
             echo "---- emulator process ----"
@@ -91,13 +91,13 @@ jobs:
             echo "---- emulator output ----"
             cat "$RUNNER_TEMP/emulator.log" || true
             echo "---- adb devices ----"
-            adb devices -l || true
-            adb -s "$ANDROID_SERIAL" shell getprop > "$RUNNER_TEMP/boot-properties.txt" 2>&1 || true
-            adb -s "$ANDROID_SERIAL" logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
+            timeout 10s adb devices -l || true
+            timeout 10s adb -s "$ANDROID_SERIAL" shell getprop > "$RUNNER_TEMP/boot-properties.txt" 2>&1 || true
+            timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
           }
 
           deadline=$((SECONDS + 600))
-          until adb -s "$ANDROID_SERIAL" get-state >/dev/null 2>&1; do
+          until timeout 10s adb -s "$ANDROID_SERIAL" get-state >/dev/null 2>&1; do
             if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
               dump_diagnostics
               echo "::error::Android emulator process exited before ADB became available"
@@ -111,7 +111,7 @@ jobs:
             sleep 5
           done
 
-          until [ "$(adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do
+          until [ "$(timeout 10s adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" = "1" ]; do
             if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
               dump_diagnostics
               echo "::error::Android emulator process exited before boot completed"
@@ -125,9 +125,9 @@ jobs:
             sleep 5
           done
 
-          adb -s "$ANDROID_SERIAL" shell settings put global window_animation_scale 0 || true
-          adb -s "$ANDROID_SERIAL" shell settings put global transition_animation_scale 0 || true
-          adb -s "$ANDROID_SERIAL" shell settings put global animator_duration_scale 0 || true
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global window_animation_scale 0 || true
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global transition_animation_scale 0 || true
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global animator_duration_scale 0 || true
           echo "Emulator boot completed."
 
       - name: Install, launch, and inspect app in emulator
@@ -138,18 +138,18 @@ jobs:
           set -euo pipefail
           APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          adb -s "$ANDROID_SERIAL" install -r "$APK"
-          adb -s "$ANDROID_SERIAL" shell am force-stop com.cube.channelonly || true
-          adb -s "$ANDROID_SERIAL" shell am start -n com.cube.channelonly/.MainActivity
+          timeout 120s adb -s "$ANDROID_SERIAL" install -r "$APK"
+          timeout 15s adb -s "$ANDROID_SERIAL" shell am force-stop com.cube.channelonly || true
+          timeout 30s adb -s "$ANDROID_SERIAL" shell am start -n com.cube.channelonly/.MainActivity
           sleep 10
-          PID="$(adb -s "$ANDROID_SERIAL" shell pidof com.cube.channelonly | tr -d '\r')"
+          PID="$(timeout 10s adb -s "$ANDROID_SERIAL" shell pidof com.cube.channelonly | tr -d '\r' || true)"
           if [ -z "$PID" ]; then
-            adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt" || true
+            timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt" || true
             cat "$RUNNER_TEMP/logcat.txt"
             echo "::error::App process did not remain alive after launch"
             exit 1
           fi
-          adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt"
+          timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt"
           if grep -qE 'FATAL EXCEPTION|Process: com[.]cube[.]channelonly' "$RUNNER_TEMP/logcat.txt"; then
             cat "$RUNNER_TEMP/logcat.txt"
             echo "::error::Detected an app crash in emulator logcat"
