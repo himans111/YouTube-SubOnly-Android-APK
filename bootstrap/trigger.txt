@@ -35,3 +35,5 @@ Polish login card elevation, compact spacing, and Google button contrast; run fu
 Fix the Credential Manager GetSignInWithGoogleOption constructor to pass the Web client ID at construction, then verify build/tests/emulator and capture the polished login screenshot.
 
 Polish the ChannelOnly sign-in card: brand title, email/password placeholders, clear Log in action, and Continue with Google as the second method. Rebuild, run unit tests, install/launch on emulator, and capture the latest login screenshot.
+
+Compact the mobile login card so the brand header, email/password form, password reset, account creation, Google sign-in, and setup notice fit better on a typical phone. Run unit tests, APK build, emulator launch, and screenshot capture.
