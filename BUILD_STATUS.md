@@ -3,13 +3,15 @@
 ## Latest validated build
 
 - Repository: https://github.com/himans111/YouTube-SubOnly-Android-APK
-- Latest completed full validation: [GitHub Actions run #37](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39675359818), source commit `aef35c6d8a16f2309e677b15d7604260ad43d0f5`.
-- Passed: Gradle unit tests, debug APK assembly, emulator boot, APK install/launch, app-process/crash-log inspection, and login-screen screenshot capture/upload.
-- Run #37 APK artifact: `channelonly-debug-apk`, artifact ID `12381432072`; extracted APK SHA-256 `46fdf1489386a2bb93bcc58d0a022e180f0105c2402c0a8191433d7e126268f3`.
-- Login screen provides Firebase email/password login, password reset, account creation, and a separate Continue with Google action using Android Credential Manager and Firebase ID-token authentication.
-- After visually inspecting the emulator screenshot, a follow-up compact-layout change was committed in `MainActivity.kt` to reduce header size and shorten setup/help copy so more of the login screen fits on a typical phone. Its validation is running in [GitHub Actions run #38](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39675925429); do not mark that latest layout as validated until run #38 completes.
-- The emulator checks installation and launch only. Neither run proves live Firebase authentication, Google OAuth, YouTube API access, embedded playback, or PiP on a physical device.
-- The current CI APK is a debug build. Real Firebase project values, a valid Web OAuth client ID, Google Cloud consent/testing setup, and an HTTPS player origin for embedded playback/PiP are still required.
+- Latest completed full validation: [GitHub Actions run #38](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39675925429), source commit `40509445f37fabba3a43b46817e459c7a777aecb`.
+- Passed: source validation, Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, app launch, app-process/crash-log inspection, and login-screen screenshot capture/upload.
+- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12381811625`; downloaded APK size 20,522,376 bytes and SHA-256 `41239ccb0df9474313c34db1d588d3fa6d2f40187b5b99a986375ce359d0cf39`.
+- Latest emulator screenshot artifact: `channelonly-login-screen`, artifact ID `12382131580`; screenshot dimensions 1080 × 1920.
+- Sign-in UI has email/password login, account creation, password reset, and Continue with Google via Android Credential Manager → Firebase Google ID-token sign-in. The layout has been compacted for phone screens.
+- PiP rejects placeholder HTTPS origins, sample Firebase values are treated as unconfigured, and `local.properties.example` leaves `playerOrigin` blank.
+- Emulator smoke test verifies install, launch, and no immediate process crash. It does not validate a real Firebase login, Google OAuth, YouTube API actions, embedded playback, or PiP on physical hardware.
+- Release blockers that require the app operator's real project details: Firebase credentials and enabled providers; a valid Google Web OAuth client ID and Android OAuth setup; an HTTPS player origin for embedded playback/PiP; and completion of the privacy policy contact/operator/account-deletion fields.
+- This is a debug APK, not a signed production release.
 
 ## Application logic improvements
 
