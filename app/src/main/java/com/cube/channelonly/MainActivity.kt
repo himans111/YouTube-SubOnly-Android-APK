@@ -168,10 +168,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun isConfiguredPlayerOrigin(): Boolean {
+        val configured = BuildConfig.PLAYER_ORIGIN.trim()
+        if (!configured.startsWith("https://", ignoreCase = true)) return false
+        return try {
+            val uri = Uri.parse(configured)
+            val host = uri.host?.lowercase().orEmpty()
+            host.isNotBlank() &&
+                host != "example.com" &&
+                !host.endsWith(".example") &&
+                !host.startsWith("your-site") &&
+                (uri.path.isNullOrBlank() || uri.path == "/") &&
+                uri.query.isNullOrBlank() &&
+                uri.fragment.isNullOrBlank()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun updatePipEligibility(visible: Boolean) {
-        val canEnterPip = visible &&
-            BuildConfig.PLAYER_ORIGIN.trim().startsWith("https://") &&
-            !BuildConfig.PLAYER_ORIGIN.contains("example.com")
+        val canEnterPip = visible && isConfiguredPlayerOrigin()
         playerVisibleForPip = canEnterPip
 
         // Android 12+ recommends enabling auto-enter early for smoother gesture-navigation PiP.
