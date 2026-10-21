@@ -109,6 +109,28 @@ import java.net.URLEncoder
 
 private const val YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
 
+/** One shared origin check keeps embedded playback and PiP eligibility consistent. */
+internal fun isUsablePlayerOrigin(value: String): Boolean {
+    val configured = value.trim()
+    return try {
+        val uri = java.net.URI(configured)
+        val host = uri.host?.lowercase().orEmpty()
+        uri.scheme.equals("https", ignoreCase = true) &&
+            host.isNotBlank() &&
+            host != "example.com" &&
+            !host.endsWith(".example") &&
+            !host.startsWith("your-site") &&
+            !host.startsWith("your-real-domain") &&
+            !host.startsWith("replace-me") &&
+            uri.userInfo == null &&
+            (uri.rawPath.isNullOrBlank() || uri.rawPath == "/") &&
+            uri.query == null &&
+            uri.fragment == null
+    } catch (_: Exception) {
+        false
+    }
+}
+
 class MainActivity : ComponentActivity() {
     private var auth: FirebaseAuth? = null
     private var currentUser by mutableStateOf<FirebaseUser?>(null)
@@ -190,25 +212,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun isConfiguredPlayerOrigin(): Boolean {
-        val configured = BuildConfig.PLAYER_ORIGIN.trim()
-        if (!configured.startsWith("https://", ignoreCase = true)) return false
-        return try {
-            val uri = Uri.parse(configured)
-            val host = uri.host?.lowercase().orEmpty()
-            host.isNotBlank() &&
-                host != "example.com" &&
-                !host.endsWith(".example") &&
-                !host.startsWith("your-site") &&
-                !host.startsWith("your-real-domain") &&
-                !host.startsWith("replace-me") &&
-                (uri.path.isNullOrBlank() || uri.path == "/") &&
-                uri.query.isNullOrBlank() &&
-                uri.fragment.isNullOrBlank()
-        } catch (_: Exception) {
-            false
-        }
-    }
+    private fun isConfiguredPlayerOrigin(): Boolean =
+        isUsablePlayerOrigin(BuildConfig.PLAYER_ORIGIN)
 
     private fun updatePipEligibility(visible: Boolean) {
         val canEnterPip = visible && isConfiguredPlayerOrigin()
@@ -864,7 +869,7 @@ private fun PlayerScreen(video: YTVideo, onOpenYouTube: (YTVideo) -> Unit, pipMo
     val origin = BuildConfig.PLAYER_ORIGIN.trim().trimEnd('/')
     Column(Modifier.fillMaxSize().padding(if (pipMode) 0.dp else 12.dp)) {
         // Keep the WebView first and mounted across PiP transitions so video playback is less likely to reset.
-        if (origin.startsWith("https://") && !origin.contains("example.com")) {
+        if (isUsablePlayerOrigin(origin)) {
             EmbeddedYouTubeFrame(video = video, origin = origin, pipMode = pipMode)
         } else {
             Surface(
