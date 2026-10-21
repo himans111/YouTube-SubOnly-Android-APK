@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -393,17 +394,17 @@ private fun AuthScreen(
                 modifier = Modifier.fillMaxWidth().widthIn(max = 460.dp),
                 shape = RoundedCornerShape(26.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp,
-                shadowElevation = 6.dp
+                tonalElevation = 0.dp,
+                shadowElevation = 3.dp
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Surface(
-                        modifier = Modifier.size(62.dp),
+                        modifier = Modifier.size(54.dp),
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant
+                        color = Color(0xFF272727)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
@@ -414,7 +415,7 @@ private fun AuthScreen(
                             )
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         "Welcome to ChannelOnly",
                         style = MaterialTheme.typography.headlineSmall,
@@ -428,7 +429,7 @@ private fun AuthScreen(
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(26.dp))
+                    Spacer(Modifier.height(18.dp))
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
@@ -438,7 +439,7 @@ private fun AuthScreen(
                         shape = RoundedCornerShape(14.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
@@ -475,7 +476,7 @@ private fun AuthScreen(
                                 busy = false
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         if (busy) {
@@ -500,12 +501,13 @@ private fun AuthScreen(
                         Text("OR", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                         Divider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
                     }
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = onGoogleSignIn,
                         enabled = !busy && !googleSigningIn,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(14.dp)
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                     ) {
                         if (googleSigningIn) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -540,7 +542,7 @@ private fun AuthScreen(
                             textAlign = TextAlign.Center
                         )
                     }
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                     Text(
                         "Your ChannelOnly account and YouTube permissions are separate. Connect YouTube after signing in to load your subscriptions.",
                         style = MaterialTheme.typography.bodySmall,
