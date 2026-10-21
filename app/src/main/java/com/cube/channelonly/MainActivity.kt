@@ -416,15 +416,15 @@ private fun AuthScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "Welcome to ChannelOnly",
-                        style = MaterialTheme.typography.headlineSmall,
+                        "ChannelOnly",
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Your subscriptions. Your feed.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        if (createAccount) "Create your account" else "Sign in to continue",
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
                     )
@@ -433,9 +433,10 @@ private fun AuthScreen(
                         value = email,
                         onValueChange = { email = it },
                         label = { Text("Email address") },
+                        placeholder = { Text("you@example.com") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                     )
                     Spacer(Modifier.height(8.dp))
@@ -443,9 +444,10 @@ private fun AuthScreen(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Password") },
+                        placeholder = { Text("At least 6 characters") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                     )
@@ -475,13 +477,13 @@ private fun AuthScreen(
                                 busy = false
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(14.dp)
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         if (busy) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
-                            Text(if (createAccount) "Create account" else "Sign in with email")
+                            Text(if (createAccount) "Create account" else "Log in")
                         }
                     }
                     TextButton(
@@ -505,7 +507,7 @@ private fun AuthScreen(
                         onClick = onGoogleSignIn,
                         enabled = !busy && !googleSigningIn,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                     ) {
                         if (googleSigningIn) {
@@ -543,7 +545,7 @@ private fun AuthScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "Your ChannelOnly account and YouTube permissions are separate. Connect YouTube after signing in to load your subscriptions.",
+                        "Sign in with email and password, or continue securely with your Google account. YouTube access is connected separately after login.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
