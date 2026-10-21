@@ -26,12 +26,16 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -63,10 +67,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -79,10 +85,14 @@ import com.cube.channelonly.data.YTVideo
 import com.cube.channelonly.data.YouTubeApi
 import com.cube.channelonly.ui.ChannelOnlyTheme
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
 import com.google.android.gms.common.api.Scope
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseUser
 import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -99,6 +109,8 @@ class MainActivity : ComponentActivity() {
     private var currentUser by mutableStateOf<FirebaseUser?>(null)
     private var youtubeToken by mutableStateOf<String?>(null)
     private var youtubeConnectionMessage by mutableStateOf("YouTube not connected")
+    private var googleSignInMessage by mutableStateOf("")
+    private var googleSigningIn by mutableStateOf(false)
     private var playerVisibleForPip = false
     private var inPipMode by mutableStateOf(false)
     private val authorizationClient by lazy { Identity.getAuthorizationClient(this) }
@@ -118,6 +130,51 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val googleSignInLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK || result.data == null) {
+            googleSigningIn = false
+            googleSignInMessage = if (result.resultCode == Activity.RESULT_CANCELED) {
+                "Google sign-in was cancelled."
+            } else {
+                "Google sign-in did not complete. Please try again."
+            }
+        } else {
+            try {
+                val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                    .getResult(ApiException::class.java)
+                val idToken = account.idToken
+                if (idToken.isNullOrBlank()) {
+                    googleSigningIn = false
+                    googleSignInMessage = "Google did not return an ID token. Check the Web OAuth client ID and Firebase Google provider setup."
+                } else {
+                    val firebase = auth
+                    if (firebase == null) {
+                        googleSigningIn = false
+                        googleSignInMessage = "Firebase is not configured. Add your real Firebase project values first."
+                    } else {
+                        googleSigningIn = true
+                        googleSignInMessage = ""
+                        val credential = GoogleAuthProvider.getCredential(idToken, null)
+                        firebase.signInWithCredential(credential).addOnCompleteListener { task ->
+                            googleSigningIn = false
+                            googleSignInMessage = if (task.isSuccessful) "" else {
+                                task.exception?.localizedMessage ?: "Firebase Google sign-in failed. Check that Google is enabled in Firebase Authentication."
+                            }
+                        }
+                    }
+                }
+            } catch (e: ApiException) {
+                googleSigningIn = false
+                googleSignInMessage = "Google sign-in failed (code ${e.statusCode}). Check OAuth settings and try again."
+            } catch (e: Exception) {
+                googleSigningIn = false
+                googleSignInMessage = e.localizedMessage ?: "Google sign-in failed. Please try again."
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         auth = FirebaseSetup.initialize(this)
@@ -128,6 +185,9 @@ class MainActivity : ComponentActivity() {
                 if (currentUser == null) {
                     AuthScreen(
                         firebaseConfigured = auth != null,
+                        googleSignInMessage = googleSignInMessage,
+                        googleSigningIn = googleSigningIn,
+                        onGoogleSignIn = { launchGoogleSignIn() },
                         onSubmit = { email, password, createAccount ->
                             val firebase = auth
                             if (firebase == null) "Firebase is not configured. Follow README setup steps first."
@@ -227,6 +287,33 @@ class MainActivity : ComponentActivity() {
         inPipMode = isInPictureInPictureMode
     }
 
+    private fun launchGoogleSignIn() {
+        if (auth == null) {
+            googleSignInMessage = "Set up your Firebase project before using Google sign-in."
+            return
+        }
+        val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
+        if (webClientId.isBlank() ||
+            !webClientId.endsWith(".apps.googleusercontent.com") ||
+            webClientId.contains("YOUR_", ignoreCase = true)
+        ) {
+            googleSignInMessage = "Google login setup needed: add googleWebClientId (Web application OAuth client ID) to local.properties."
+            return
+        }
+        try {
+            val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestIdToken(webClientId)
+                .build()
+            googleSignInMessage = ""
+            googleSigningIn = true
+            googleSignInLauncher.launch(GoogleSignIn.getClient(this, options).signInIntent)
+        } catch (e: Exception) {
+            googleSigningIn = false
+            googleSignInMessage = e.localizedMessage ?: "Could not open Google sign-in."
+        }
+    }
+
     private fun requestYoutubeAccess() {
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(YOUTUBE_SCOPE)))
@@ -278,6 +365,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AuthScreen(
     firebaseConfigured: Boolean,
+    googleSignInMessage: String,
+    googleSigningIn: Boolean,
+    onGoogleSignIn: () -> Unit,
     onSubmit: suspend (String, String, Boolean) -> String,
     onForgotPassword: suspend (String) -> String
 ) {
@@ -290,49 +380,174 @@ private fun AuthScreen(
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 30.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("▶ ChannelOnly", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            Text("Your subscriptions. Your feed.", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(28.dp))
-            OutlinedTextField(email, { email = it }, label = { Text("Email address") }, singleLine = true, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth(), visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
-            Spacer(Modifier.height(16.dp))
-            Button(
-                enabled = !busy && email.contains("@") && password.length >= 6 && firebaseConfigured,
-                onClick = {
-                    busy = true
-                    message = ""
-                    scope.launch {
-                        message = onSubmit(email.trim(), password, createAccount)
-                        busy = false
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
+            Surface(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 460.dp),
+                shape = RoundedCornerShape(26.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                shadowElevation = 6.dp
             ) {
-                if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text(if (createAccount) "Create account" else "Sign in with email")
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Surface(
+                        modifier = Modifier.size(62.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                "▶",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        "Welcome to ChannelOnly",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Your subscriptions. Your feed.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(26.dp))
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email address") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            enabled = email.contains("@") && !busy && !googleSigningIn && firebaseConfigured,
+                            onClick = {
+                                busy = true
+                                message = ""
+                                scope.launch {
+                                    message = onForgotPassword(email.trim())
+                                    busy = false
+                                }
+                            }
+                        ) { Text("Forgot password?") }
+                    }
+                    Button(
+                        enabled = !busy && !googleSigningIn && email.contains("@") && password.length >= 6 && firebaseConfigured,
+                        onClick = {
+                            busy = true
+                            message = ""
+                            scope.launch {
+                                message = onSubmit(email.trim(), password, createAccount)
+                                busy = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        if (busy) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(if (createAccount) "Create account" else "Sign in with email")
+                        }
+                    }
+                    TextButton(
+                        enabled = !busy && !googleSigningIn,
+                        onClick = { createAccount = !createAccount; message = "" }
+                    ) {
+                        Text(if (createAccount) "Already have an account? Sign in" else "New here? Create an account")
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Divider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+                        Text("OR", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                        Divider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = onGoogleSignIn,
+                        enabled = !busy && !googleSigningIn,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        if (googleSigningIn) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.size(10.dp))
+                            Text("Connecting to Google…")
+                        } else {
+                            Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                            Spacer(Modifier.size(12.dp))
+                            Text("Continue with Google")
+                        }
+                    }
+                    if (!firebaseConfigured) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Setup needed: add real Firebase values to local.properties and enable Email/Password and Google sign-in in Firebase Console.",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    val visibleMessage = when {
+                        googleSignInMessage.isNotBlank() -> googleSignInMessage
+                        message.isNotBlank() -> message
+                        else -> ""
+                    }
+                    if (visibleMessage.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            visibleMessage,
+                            color = MaterialTheme.colorScheme.secondary,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Your ChannelOnly account and YouTube permissions are separate. Connect YouTube after signing in to load your subscriptions.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
-            TextButton(onClick = { createAccount = !createAccount; message = "" }) {
-                Text(if (createAccount) "Already have an account? Sign in" else "New here? Create an account")
-            }
-            TextButton(enabled = email.contains("@") && !busy && firebaseConfigured, onClick = {
-                busy = true
-                scope.launch { message = onForgotPassword(email.trim()); busy = false }
-            }) { Text("Forgot password?") }
-            if (!firebaseConfigured) {
-                Text("Setup needed: add your Firebase values to local.properties, then enable Email/Password in Firebase Console.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-            }
-            if (message.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(message, style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(Modifier.height(16.dp))
-            Text("YouTube access is connected separately after sign-in. Never enter your Google password in this app.", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
