@@ -5,7 +5,7 @@ ChannelOnly is an Android starter project for a focused YouTube experience: the 
 ## Included
 
 - Dark-mode sign-in screen with Firebase Email/Password sign-in, account creation, password reset, and a separate Continue with Google button (requires your Firebase and OAuth settings).
-- Google account sign-in through Firebase Authentication; YouTube data permission is requested separately after the app account login.
+- Google account sign-in through Firebase Authentication using Android Credential Manager; YouTube data permission is requested separately after the app account login.
 - Separate Google authorization for YouTube subscriptions; the app never asks for a Google password directly.
 - Search for YouTube channels and subscribe/unsubscribe.
 - Home feed built only from subscribed channels, with an additional client-side channel-ID filter.
