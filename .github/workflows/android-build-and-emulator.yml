@@ -2,6 +2,8 @@ name: Android build and emulator smoke test
 
 on:
   push:
+    paths:
+      - 'bootstrap/trigger.txt'
   workflow_dispatch:
 
 permissions:
