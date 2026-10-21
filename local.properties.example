@@ -1,0 +1,9 @@
+# Keep these values in local.properties (do not commit local.properties).
+# Preserve any existing sdk.dir line created by Android Studio.
+firebaseApiKey=YOUR_FIREBASE_WEB_API_KEY
+firebaseAppId=1:1234567890:android:YOUR_APP_ID
+firebaseProjectId=your-firebase-project-id
+firebaseSenderId=1234567890
+# Optional: an HTTPS origin you control for the embedded YouTube IFrame player.
+# Leave blank to use the "Open in YouTube" button instead.
+playerOrigin=https://your-site.example
