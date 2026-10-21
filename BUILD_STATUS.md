@@ -3,14 +3,16 @@
 ## Latest validated build
 
 - Repository: https://github.com/himans111/YouTube-SubOnly-Android-APK
-- Latest completed full validation: [GitHub Actions run #38](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39675925429), source commit `40509445f37fabba3a43b46817e459c7a777aecb`.
-- Passed: source validation, Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, app launch, app-process/crash-log inspection, and login-screen screenshot capture/upload.
-- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12381811625`; downloaded APK size 20,522,376 bytes and SHA-256 `41239ccb0df9474313c34db1d588d3fa6d2f40187b5b99a986375ce359d0cf39`.
-- Latest emulator screenshot artifact: `channelonly-login-screen`, artifact ID `12382131580`; screenshot dimensions 1080 × 1920.
-- Sign-in UI has email/password login, account creation, password reset, and Continue with Google via Android Credential Manager → Firebase Google ID-token sign-in. The layout has been compacted for phone screens.
-- PiP rejects placeholder HTTPS origins, sample Firebase values are treated as unconfigured, and `local.properties.example` leaves `playerOrigin` blank.
-- Emulator smoke test verifies install, launch, and no immediate process crash. It does not validate a real Firebase login, Google OAuth, YouTube API actions, embedded playback, or PiP on physical hardware.
-- Release blockers that require the app operator's real project details: Firebase credentials and enabled providers; a valid Google Web OAuth client ID and Android OAuth setup; an HTTPS player origin for embedded playback/PiP; and completion of the privacy policy contact/operator/account-deletion fields.
+- Latest completed full validation: [GitHub Actions run #39](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39688775159), source/trigger commit `b3b6381bdebca29634ad8d169c47f9bde7bbf353`.
+- Passed: source validation, all Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, activity launch, app-process/crash-log inspection, and login-screen screenshot capture/upload.
+- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12386469673`; downloaded APK size 20,522,850 bytes and SHA-256 `b5e4e933d35e346b7f031871783ee9a19a614ac723d53ac8cf4682b89533e621`.
+- Latest login screenshot artifact: `channelonly-login-screen`, artifact ID `12388490045`; PNG dimensions 1080 × 1920.
+- Login UI: email/password sign-in, account creation, password reset, and Continue with Google via Android Credential Manager → Firebase Google ID-token sign-in.
+- Shared HTTPS player-origin validation now gates both embedded playback and PiP eligibility; new unit tests cover valid origins and reject blank, insecure, placeholder, or path/query/fragment-containing origins.
+- Sample Firebase values are treated as unconfigured, and `local.properties.example` leaves `playerOrigin` blank by default.
+- Emulator smoke test checks install/launch and immediate process stability. It does not validate live Firebase authentication, Google OAuth, YouTube account/API actions, embedded playback, or PiP on a physical device.
+- To activate real-account sign-in, the operator must configure Firebase values/providers and a valid Google Web OAuth client/Android OAuth client. Embedded playback/PiP additionally needs a real HTTPS origin the operator controls.
+- `player-origin-site/privacy.html` remains a draft; complete the real operator, contact, data-practices and account-deletion details before public release.
 - This is a debug APK, not a signed production release.
 
 ## Application logic improvements
