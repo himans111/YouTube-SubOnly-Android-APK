@@ -1,1 +1,2 @@
 All 10 source archive chunks have been committed and verified to total 29,900 base64 characters. This marker triggers the Android build and emulator smoke test workflow.
+SDK setup fix committed; rerun build and emulator smoke test.
