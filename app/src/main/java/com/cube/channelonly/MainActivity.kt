@@ -357,25 +357,25 @@ private fun MainScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    if (!inPipMode) {
-                    if (selectedVideo == null) Text("▶ ChannelOnly", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    else Text("Now playing", fontWeight = FontWeight.SemiBold)
-                }
-                },
-                navigationIcon = {
-                    if (!inPipMode && selectedVideo != null) androidx.compose.material3.IconButton(onClick = {
-                        selectedVideo = null
-                        onPlayerVisibilityChanged(false)
-                    }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            if (!inPipMode) {
+                TopAppBar(
+                    title = {
+                        if (selectedVideo == null) Text("▶ ChannelOnly", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        else Text("Now playing", fontWeight = FontWeight.SemiBold)
+                    },
+                    navigationIcon = {
+                        if (selectedVideo != null) androidx.compose.material3.IconButton(onClick = {
+                            selectedVideo = null
+                            onPlayerVisibilityChanged(false)
+                        }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        TextButton(onClick = { showAccountMenu = true }) { Text("Account") }
                     }
-                },
-                actions = {
-                    TextButton(onClick = { showAccountMenu = true }) { Text("Account") }
-                }
-            )
+                )
+            }
         },
         bottomBar = {
             if (!inPipMode && selectedVideo == null) NavigationBar {
