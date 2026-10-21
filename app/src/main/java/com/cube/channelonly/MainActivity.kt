@@ -1,9 +1,12 @@
 package com.cube.channelonly
 
 import android.app.Activity
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Rational
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -95,6 +98,8 @@ class MainActivity : ComponentActivity() {
     private var currentUser by mutableStateOf<FirebaseUser?>(null)
     private var youtubeToken by mutableStateOf<String?>(null)
     private var youtubeConnectionMessage by mutableStateOf("YouTube not connected")
+    private var playerVisibleForPip = false
+    private var inPipMode by mutableStateOf(false)
     private val authorizationClient by lazy { Identity.getAuthorizationClient(this) }
 
     private val authorizationLauncher = registerForActivityResult(
@@ -145,6 +150,12 @@ class MainActivity : ComponentActivity() {
                         connectionMessage = youtubeConnectionMessage,
                         onConnectYoutube = { requestYoutubeAccess() },
                         onDisconnectYoutube = { disconnectYoutube() },
+                        inPipMode = inPipMode,
+                        onPlayerVisibilityChanged = { visible ->
+                            playerVisibleForPip = visible &&
+                                BuildConfig.PLAYER_ORIGIN.trim().startsWith("https://") &&
+                                !BuildConfig.PLAYER_ORIGIN.contains("example.com")
+                        },
                         onSignOut = {
                             auth?.signOut()
                             youtubeToken = null
@@ -154,6 +165,30 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (playerVisibleForPip && !inPipMode) {
+            try {
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9))
+                    .build()
+                enterPictureInPictureMode(params)
+            } catch (_: IllegalStateException) {
+                // PiP may be unavailable for an activity transition or device policy.
+            } catch (_: UnsupportedOperationException) {
+                // Respect devices that do not offer Picture-in-Picture.
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPipMode = isInPictureInPictureMode
     }
 
     private fun requestYoutubeAccess() {
@@ -276,6 +311,8 @@ private fun MainScreen(
     connectionMessage: String,
     onConnectYoutube: () -> Unit,
     onDisconnectYoutube: () -> Unit,
+    inPipMode: Boolean,
+    onPlayerVisibilityChanged: (Boolean) -> Unit,
     onSignOut: () -> Unit
 ) {
     val api = remember { YouTubeApi() }
@@ -309,18 +346,29 @@ private fun MainScreen(
 
     LaunchedEffect(token) {
         if (token != null) refreshFeed()
-        else { subscriptions = emptyList(); feed = emptyList(); searchResults = emptyList() }
+        else {
+            subscriptions = emptyList()
+            feed = emptyList()
+            searchResults = emptyList()
+            selectedVideo = null
+            onPlayerVisibilityChanged(false)
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
+                    if (!inPipMode) {
                     if (selectedVideo == null) Text("▶ ChannelOnly", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     else Text("Now playing", fontWeight = FontWeight.SemiBold)
+                }
                 },
                 navigationIcon = {
-                    if (selectedVideo != null) androidx.compose.material3.IconButton(onClick = { selectedVideo = null }) {
+                    if (!inPipMode && selectedVideo != null) androidx.compose.material3.IconButton(onClick = {
+                        selectedVideo = null
+                        onPlayerVisibilityChanged(false)
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -330,7 +378,7 @@ private fun MainScreen(
             )
         },
         bottomBar = {
-            if (selectedVideo == null) NavigationBar {
+            if (!inPipMode && selectedVideo == null) NavigationBar {
                 NavigationBarItem(selected = tab == MainTab.HOME, onClick = { tab = MainTab.HOME }, icon = { Icon(Icons.Default.Home, contentDescription = "Home") }, label = { Text("Home") })
                 NavigationBarItem(selected = tab == MainTab.SEARCH, onClick = { tab = MainTab.SEARCH }, icon = { Icon(Icons.Default.Search, contentDescription = "Search") }, label = { Text("Search") })
                 NavigationBarItem(selected = tab == MainTab.SUBSCRIPTIONS, onClick = { tab = MainTab.SUBSCRIPTIONS }, icon = { Icon(Icons.Default.Subscriptions, contentDescription = "Subscriptions") }, label = { Text("Subscriptions") })
@@ -365,7 +413,7 @@ private fun MainScreen(
                 }
             } else if (selectedVideo != null) {
                 val playerContext = LocalContext.current
-                PlayerScreen(video = selectedVideo!!, onOpenYouTube = { openYouTube(it, playerContext) })
+                PlayerScreen(video = selectedVideo!!, onOpenYouTube = { openYouTube(it, playerContext) }, pipMode = inPipMode)
             } else {
                 when (tab) {
                     MainTab.HOME -> HomeScreen(
@@ -374,7 +422,10 @@ private fun MainScreen(
                         loading = loading,
                         message = message,
                         onRefresh = { refreshFeed() },
-                        onPlay = { selectedVideo = it }
+                        onPlay = {
+                            selectedVideo = it
+                            onPlayerVisibilityChanged(true)
+                        }
                     )
                     MainTab.SEARCH -> SearchScreen(
                         query = searchText,
@@ -554,17 +605,18 @@ private fun ChannelRow(
 }
 
 @Composable
-private fun PlayerScreen(video: YTVideo, onOpenYouTube: (YTVideo) -> Unit) {
+private fun PlayerScreen(video: YTVideo, onOpenYouTube: (YTVideo) -> Unit, pipMode: Boolean) {
     val origin = BuildConfig.PLAYER_ORIGIN.trim().trimEnd('/')
-    Column(Modifier.fillMaxSize().padding(12.dp)) {
-        Text(video.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(4.dp))
-        Text(video.channelTitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-        Spacer(Modifier.height(12.dp))
+    Column(Modifier.fillMaxSize().padding(if (pipMode) 0.dp else 12.dp)) {
+        // Keep the WebView first and mounted across PiP transitions so video playback is less likely to reset.
         if (origin.startsWith("https://") && !origin.contains("example.com")) {
-            EmbeddedYouTubeFrame(video = video, origin = origin)
+            EmbeddedYouTubeFrame(video = video, origin = origin, pipMode = pipMode)
         } else {
-            Surface(Modifier.fillMaxWidth().aspectRatio(16f / 9f), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp)) {
+            Surface(
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp)
+            ) {
                 Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.VideoLibrary, contentDescription = null, modifier = Modifier.size(44.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(12.dp))
@@ -574,13 +626,19 @@ private fun PlayerScreen(video: YTVideo, onOpenYouTube: (YTVideo) -> Unit) {
                 }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Text("The YouTube player keeps its standard controls and related-video experience. The app filters the home feed to subscribed channel IDs.", style = MaterialTheme.typography.bodySmall)
+        if (!pipMode) {
+            Spacer(Modifier.height(12.dp))
+            Text(video.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(video.channelTitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.height(12.dp))
+            Text("The YouTube player keeps its standard controls and related-video experience. The app filters the home feed to subscribed channel IDs.", style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
 @Composable
-private fun EmbeddedYouTubeFrame(video: YTVideo, origin: String) {
+private fun EmbeddedYouTubeFrame(video: YTVideo, origin: String, pipMode: Boolean) {
     val context = LocalContext.current
     val html = remember(video.videoId, origin) {
         val encodedOrigin = Uri.encode(origin)
@@ -588,12 +646,13 @@ private fun EmbeddedYouTubeFrame(video: YTVideo, origin: String) {
     }
     androidx.compose.runtime.key(video.videoId, origin) {
         AndroidView(
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+            modifier = if (pipMode) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f),
             factory = {
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = true
+                    settings.javaScriptCanOpenWindowsAutomatically = false
                     webChromeClient = WebChromeClient()
                     webViewClient = WebViewClient()
                     loadDataWithBaseURL(origin, html, "text/html", "UTF-8", null)
