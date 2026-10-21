@@ -385,7 +385,7 @@ private fun AuthScreen(
                 .fillMaxSize()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 24.dp),
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -397,11 +397,11 @@ private fun AuthScreen(
                 shadowElevation = 3.dp
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Surface(
-                        modifier = Modifier.size(54.dp),
+                        modifier = Modifier.size(44.dp),
                         shape = CircleShape,
                         color = Color(0xFF272727)
                     ) {
@@ -414,21 +414,21 @@ private fun AuthScreen(
                             )
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(7.dp))
                     Text(
                         "ChannelOnly",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         if (createAccount) "Create your account" else "Sign in to continue",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
@@ -439,7 +439,7 @@ private fun AuthScreen(
                         shape = RoundedCornerShape(12.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
@@ -523,7 +523,7 @@ private fun AuthScreen(
                     if (!firebaseConfigured) {
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            "Setup needed: add real Firebase values to local.properties and enable Email/Password and Google sign-in in Firebase Console.",
+                            "Setup needed: configure Firebase and enable Email/Password + Google sign-in.",
                             color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center
@@ -543,9 +543,9 @@ private fun AuthScreen(
                             textAlign = TextAlign.Center
                         )
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        "Sign in with email and password, or continue securely with your Google account. YouTube access is connected separately after login.",
+                        "After login, connect YouTube to load your subscriptions.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
