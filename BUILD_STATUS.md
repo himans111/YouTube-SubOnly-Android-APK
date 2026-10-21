@@ -3,11 +3,13 @@
 ## Latest validated build
 
 - Repository: https://github.com/himans111/YouTube-SubOnly-Android-APK
-- Latest completed full validation: [GitHub Actions run #32](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39664156806), source commit `acb485244a4b5c521191a56962851914167240b0`.
-- Passed: source validation, Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, activity launch, and app-process/crash-log inspection.
-- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12376716395`; extracted APK is 20,488,707 bytes and SHA-256 `0f7e51c578c9c5ff3b2c1751f37135a51d9e2399ccb6555f88562a147a0df389`.
-- Recent hardening included rejecting placeholder HTTPS player origins for PiP, leaving optional `playerOrigin` blank in the example config, and rejecting non-empty sample Firebase credentials rather than enabling a misleading login screen.
-- Hosted emulator smoke test proves only that the app installs and launches. It does not verify live Firebase login, Google OAuth, YouTube API behavior, embedded playback, or PiP on a physical device.
+- Latest completed full validation: [GitHub Actions run #36](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39670930342), source commit `087c7f7fab84c1e2dd80982d6f5deeb6f70a0de9`.
+- Passed: source validation, Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, activity launch, app-process/crash-log inspection, and login-screen screenshot capture/upload.
+- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12380605307`; extracted APK is 20,522,376 bytes with SHA-256 `223692cf24abfe6a7cd4e7e9b12a9695deb5377161f86ca7fc4fb4d01a309f70`.
+- Latest emulator login screenshot artifact: `channelonly-login-screen`, artifact ID `12380595511`.
+- Login screen now offers Firebase email/password sign-in, password reset, account creation, and Google sign-in using Android Credential Manager with Firebase ID-token authentication. YouTube Data API authorization remains a separate post-login flow.
+- Recent hardening rejects placeholder Firebase credentials and placeholder HTTPS player origins for PiP; the example config keeps `playerOrigin` blank by default.
+- Hosted emulator smoke test proves only that the app installs and launches and that its login screen can be captured. It does not verify live Firebase authentication, real Google OAuth, YouTube API behavior, embedded playback, or PiP on a physical device.
 
 ## Application logic improvements
 
