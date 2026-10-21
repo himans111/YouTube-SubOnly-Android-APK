@@ -25,3 +25,5 @@ Try granting the ephemeral hosted runner account access to /dev/kvm via setfacl/
 Reject placeholder HTTPS player origins so copied sample configuration cannot incorrectly enable PiP; rerun unit tests, debug APK build, and Android emulator launch smoke test.
 
 Reject placeholder Firebase credentials as unconfigured; validate the combined PiP-origin and Firebase placeholder fixes with unit tests, APK build, and emulator smoke test.
+
+Redesign sign-in UI to offer Firebase email/password and Continue with Google, add Google OAuth Web client ID configuration and setup guidance, and capture the login screen from the emulator for visual validation.
