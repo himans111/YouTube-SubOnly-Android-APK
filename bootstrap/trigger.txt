@@ -4,3 +4,4 @@ Fix SDK license pipeline and retry CI.
 Apply Kotlin return fixes and align Kotlin compiler with Firebase Auth metadata; retry CI.
 Fix YAML indentation for CI source patch and rerun build.
 Build directly from committed source with Kotlin compilerOptions fix.
+Remove duplicate Java MainActivity and retry compile/emulator test.
