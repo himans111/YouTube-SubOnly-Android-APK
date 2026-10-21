@@ -2,13 +2,13 @@
 
 यह guide app को अपने accounts/configuration के साथ चलाने के लिए है। सिर्फ APK build हो जाना Firebase या YouTube login के सक्रिय होने का प्रमाण नहीं है।
 
-## 1. Firebase Email/Password login
+## 1. Firebase Email/Password और Google login
 
 1. Firebase Console में project बनाएँ और Android app register करें।
-2. Android package name बिल्कुल यह रखें: com.cube.channelonly
-3. Firebase Authentication → Sign-in method में Email/Password enable करें।
+2. Android package name बिल्कुल यह रखें: `com.cube.channelonly`।
+3. Firebase Authentication → Sign-in method में **Email/Password** और **Google** दोनों providers enable करें। Google provider में support email चुनकर Save करें।
 4. Project settings → General → Your apps से API key, App ID, Project ID और Project number/Sender ID लें।
-6. Android project root में local.properties खोलें। अगर उसमें sdk.dir पहले से है, तो उसे हटाएँ नहीं। local.properties.example के placeholder values को अपनी Firebase values से बदलें। उदाहरण:
+5. Android project root में `local.properties` खोलें। अगर उसमें `sdk.dir` पहले से है, तो उसे हटाएँ नहीं। `local.properties.example` के placeholder values को अपनी Firebase values से बदलें। उदाहरण:
 
         firebaseApiKey=YOUR_REAL_FIREBASE_WEB_API_KEY
         firebaseAppId=1:YOUR_SENDER_ID:android:YOUR_REAL_APP_ID
@@ -17,8 +17,8 @@
         googleWebClientId=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
         playerOrigin=
 
-   Placeholder text को जस का तस छोड़ने पर login configure नहीं होगा।
-7. App rebuild/install करें और नया account बनाकर email sign-in, Google sign-in, sign-out तथा password reset जाँचें।
+   `googleWebClientId` Google Cloud में बने **Web application OAuth client** का Client ID है, Android OAuth Client ID नहीं। Placeholder values को जस का तस छोड़ने पर login configure नहीं होगा।
+6. App rebuild/install करें और email/password login, Google login, sign-out तथा password reset जाँचें। Google login सफल होने के बाद भी YouTube feed के लिए अलग से YouTube permission connect करना होगा।
 
 ## 2. YouTube API और Google authorization
 
