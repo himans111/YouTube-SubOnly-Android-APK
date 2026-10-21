@@ -47,7 +47,7 @@ jobs:
           echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
           echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" --install "platforms;android-36" "build-tools;35.0.0" "platform-tools"
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;35.0.0" "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64"
 
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
@@ -67,21 +67,67 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Launch app in Android emulator
-        uses: ReactiveCircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          target: google_apis
-          arch: x86_64
-          profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot -no-snapshot-save
-          disable-animations: true
-          emulator-boot-timeout: 1200
-          script: |
-            adb install "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-            adb shell am force-stop com.cube.channelonly || true
-            adb shell am start -n com.cube.channelonly/.MainActivity
+      - name: Create and boot a lightweight Android emulator
+        shell: bash
+        env:
+          ANDROID_AVD_HOME: ${{ runner.temp }}/.android/avd
+        run: |
+          set -euo pipefail
+          SDK_ROOT="$ANDROID_SDK_ROOT"
+          mkdir -p "$ANDROID_AVD_HOME"
+          export ANDROID_AVD_HOME
+          printf 'no\n' | "$SDK_ROOT/cmdline-tools/$(find "$SDK_ROOT/cmdline-tools" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)/bin/avdmanager" create avd --force --name channelonly_ci --package "system-images;android-30;google_apis;x86_64" --device pixel_2
+          nohup "$SDK_ROOT/emulator/emulator" -avd channelonly_ci -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -camera-back none > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/emulator.pid"
+          export ANDROID_SERIAL=emulator-5554
+          adb start-server
+          deadline=$((SECONDS + 900))
+          until adb -s "$ANDROID_SERIAL" get-state >/dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then cat "$RUNNER_TEMP/emulator.log"; echo "::error::ADB device did not become available"; exit 1; fi
             sleep 5
-            adb shell pidof com.cube.channelonly
-            if adb logcat -d -t 3000 | grep -qE 'FATAL EXCEPTION|Process: com[.]cube[.]channelonly'; then echo 'Detected an app crash in emulator logcat.'; exit 1; fi
+          done
+          until [ "$(adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do
+            if (( SECONDS >= deadline )); then cat "$RUNNER_TEMP/emulator.log"; adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed || true; echo "::error::Emulator did not complete boot"; exit 1; fi
+            sleep 5
+          done
+          adb -s "$ANDROID_SERIAL" shell settings put global window_animation_scale 0 || true
+          adb -s "$ANDROID_SERIAL" shell settings put global transition_animation_scale 0 || true
+          adb -s "$ANDROID_SERIAL" shell settings put global animator_duration_scale 0 || true
 
+      - name: Install, launch, and inspect app in emulator
+        shell: bash
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          set -euo pipefail
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          adb -s "$ANDROID_SERIAL" install -r "$APK"
+          adb -s "$ANDROID_SERIAL" shell am force-stop com.cube.channelonly || true
+          adb -s "$ANDROID_SERIAL" shell am start -n com.cube.channelonly/.MainActivity
+          sleep 10
+          PID="$(adb -s "$ANDROID_SERIAL" shell pidof com.cube.channelonly | tr -d '\r')"
+          if [ -z "$PID" ]; then
+            adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt" || true
+            cat "$RUNNER_TEMP/logcat.txt"
+            echo "::error::App process did not remain alive after launch"
+            exit 1
+          fi
+          adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt"
+          if grep -qE 'FATAL EXCEPTION|Process: com[.]cube[.]channelonly' "$RUNNER_TEMP/logcat.txt"; then
+            cat "$RUNNER_TEMP/logcat.txt"
+            echo "::error::Detected an app crash in emulator logcat"
+            exit 1
+          fi
+          echo "Emulator smoke test passed; app process PID: $PID"
+
+      - name: Upload emulator diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-emulator-diagnostics
+          path: |
+            ${{ runner.temp }}/emulator.log
+            ${{ runner.temp }}/logcat.txt
+          if-no-files-found: ignore
+          retention-days: 7
