@@ -21,3 +21,5 @@ Add explicit per-command ADB timeouts because adb shell can hang inside the emul
 Detect whether /dev/kvm is usable; opt into x86_64 software emulation when KVM is missing; allow up to 20 minutes for first boot.
 
 Try granting the ephemeral hosted runner account access to /dev/kvm via setfacl/chmod before falling back to opt-in software CPU emulation.
+
+Reject placeholder HTTPS player origins so copied sample configuration cannot incorrectly enable PiP; rerun unit tests, debug APK build, and Android emulator launch smoke test.
