@@ -79,14 +79,19 @@ jobs:
           AVDMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)"
           test -x "$AVDMANAGER" || { echo "::error::avdmanager executable not found"; exit 1; }
           printf 'no\n' | "$AVDMANAGER" create avd --force --name channelonly_ci --package "system-images;android-30;google_apis;x86_64" --device pixel_2
+          # Some hosted runner images expose /dev/kvm but omit the runner user from its ACL.
+          # Try granting this ephemeral runner process access before dropping to slow software mode.
+          if [ -c /dev/kvm ] && { [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; }; then
+            sudo setfacl -m "u:$(id -un):rw" /dev/kvm 2>/dev/null || sudo chmod a+rw /dev/kvm 2>/dev/null || true
+          fi
           if [ -c /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
             EMULATOR_ACCEL_ARGS=(-accel on)
-            echo "KVM is available; using hardware-accelerated x86_64 emulation."
+            echo "KVM is available to the runner; using hardware-accelerated x86_64 emulation."
           else
             # Android Emulator requires this opt-in to run the x86_64 guest without KVM.
             export ANDROID_I_WANT_MY_TCG=yes
             EMULATOR_ACCEL_ARGS=(-accel off)
-            echo "::warning::KVM is unavailable; using very slow software CPU emulation."
+            echo "::warning::KVM remains unavailable; using very slow software CPU emulation."
           fi
           nohup "$SDK_ROOT/emulator/emulator" -avd channelonly_ci "${EMULATOR_ACCEL_ARGS[@]}" -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -camera-back none > "$RUNNER_TEMP/emulator.log" 2>&1 &
           EMULATOR_PID=$!
