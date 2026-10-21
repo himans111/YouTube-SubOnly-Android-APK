@@ -58,6 +58,15 @@ jobs:
         shell: bash
         run: gradle --no-daemon -p "$PROJECT_DIR" :app:testDebugUnitTest :app:assembleDebug
 
+      - name: Upload debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-debug-apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Launch app in Android emulator
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
@@ -75,11 +84,3 @@ jobs:
             adb shell pidof com.cube.channelonly
             if adb logcat -d -t 3000 | grep -qE 'FATAL EXCEPTION|Process: com[.]cube[.]channelonly'; then echo 'Detected an app crash in emulator logcat.'; exit 1; fi
 
-      - name: Upload debug APK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: channelonly-debug-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 7
