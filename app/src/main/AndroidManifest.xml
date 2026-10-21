@@ -6,10 +6,12 @@
         android:label="ChannelOnly"
         android:supportsRtl="true"
         android:theme="@style/Theme.ChannelOnly"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="false"
+        android:resizeableActivity="true">
         <activity
             android:name="com.cube.channelonly.MainActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
+            android:supportsPictureInPicture="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
