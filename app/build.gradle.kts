@@ -29,6 +29,7 @@ android {
         buildConfigField("String", "FIREBASE_APP_ID", asBuildConfigString(localValue("firebaseAppId")))
         buildConfigField("String", "FIREBASE_PROJECT_ID", asBuildConfigString(localValue("firebaseProjectId")))
         buildConfigField("String", "FIREBASE_SENDER_ID", asBuildConfigString(localValue("firebaseSenderId")))
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", asBuildConfigString(localValue("googleWebClientId")))
         buildConfigField("String", "PLAYER_ORIGIN", asBuildConfigString(localValue("playerOrigin")))
     }
 
