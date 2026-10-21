@@ -3,11 +3,12 @@
 ## Latest validated build
 
 - Repository: https://github.com/himans111/YouTube-SubOnly-Android-APK
-- Latest source build and emulator smoke test: [GitHub Actions run #28](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39649958680), source/trigger commit `3081634091d98c0828bb5f151f931c943d42885d`.
-- Passed steps: Android source validation, Gradle unit tests, debug APK assembly, emulator creation and boot, APK installation, activity launch, and app-process/crash-log inspection.
-- The debug APK artifact is `channelonly-debug-apk`, artifact ID `12368314519`, uploaded 2026-10-21; its ZIP digest is `sha256:bf81cee079089769b0cb4c40cffdaee3e98323bdf055836896d2c04d39902c8b`.
-- The extracted APK is a valid Android package, passes ZIP integrity checks, and has SHA-256 `96015d8367e60a6c9645458f97b1c75914124a3a574772649c8521596531451d` (20,488,707 bytes).
-- At the last status check the build, boot, install, and launch steps were all successful; GitHub Actions was completing its post-job cleanup. Run #28’s build and emulator validation is therefore functionally passed.
+- Latest completed full validation: [GitHub Actions run #31](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39663981527), source commit `b3382bae80847a9b33dc0b35dcb4e1f6974d3ea5`.
+- Passed: source validation, Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, activity launch, and app-process/crash-log inspection.
+- Run #31 APK artifact: `channelonly-debug-apk`, artifact ID `12377106082`; extracted APK is 20,488,707 bytes and SHA-256 `6d3a5a1ab2656adb85ae4d923a93f966be7600c363a718911e425f5d2b1d4910`.
+- Additional source hardening committed after run #31: PiP now rejects placeholder HTTPS origins, the example `local.properties` leaves `playerOrigin` blank by default, and Firebase setup rejects non-empty sample placeholder values instead of enabling a misleading login screen.
+- Latest combined validation is [GitHub Actions run #32](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39664156806), commit `acb485244a4b5c521191a56962851914167240b0`. At the last check, Gradle unit tests/build were still running; do not treat the latest Firebase-guard change as validated until this run completes.
+- Hosted emulator smoke test proves only that the app installs and launches. It does not verify live Firebase login, Google OAuth, YouTube API behavior, embedded playback, or PiP on a physical device.
 
 ## Application logic improvements
 
