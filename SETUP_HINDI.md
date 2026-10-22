@@ -1,15 +1,16 @@
 # ChannelOnly सेटअप गाइड — बिना Firebase के
 
-इस ऐप में अलग ChannelOnly अकाउंट नहीं है। यह सीधे Google की Android authorization प्रक्रिया से YouTube अकाउंट चुनता है। **Firebase प्रोजेक्ट, Firebase API key या Web OAuth Client ID की जरूरत नहीं है।** फिर भी Google Cloud में Android OAuth client और YouTube Data API v3 सक्षम करना जरूरी है।
+इस ऐप में अलग ChannelOnly अकाउंट नहीं है। पहले Android Credential Manager से Google अकाउंट साइन-इन होता है, फिर Android AuthorizationClient से YouTube API permission ली जाती है। **Firebase की जरूरत नहीं है, लेकिन Google अकाउंट की पहचान के लिए असली Web OAuth Client ID आवश्यक है।** इसके अतिरिक्त Android OAuth client और YouTube Data API v3 भी configure करें।
 
 ## 1. Google Cloud का एक बार का सेटअप
 
 1. [Google Cloud Console](https://console.cloud.google.com/) खोलें और नया प्रोजेक्ट बनाएँ या अपना मौजूदा प्रोजेक्ट चुनें।
 2. **APIs & Services → Library** में जाकर **YouTube Data API v3** सक्षम करें।
-3. **Google Auth Platform → Branding** में ऐप का नाम और आवश्यक संपर्क जानकारी भरें। अगर Consent/Audience Testing mode में है, तो अपने Google खाते को Test users में जोड़ें।
-4. **Google Auth Platform → Clients** या **APIs & Services → Credentials** में **Create OAuth client ID → Android** चुनें।
-5. Package name बिल्कुल `com.cube.channelonly` रखें। SHA-1 fingerprint उसी APK के signing certificate का होना चाहिए जिसे फोन में इंस्टॉल कर रहे हैं.
-   - **इस final Run #43 APK का exact SHA-1:** `25:C9:62:9A:18:5A:E3:41:08:19:65:BE:D7:06:9C:B3:E8:5A:8C:D9`। यह केवल इसी APK के certificate के लिए है; दूसरे build या Play Store APK की fingerprint अलग हो सकती है.
+3. **Google Auth Platform → Branding** में ऐप का नाम और आवश्यक संपर्क जानकारी भरें।
+4. **Google Auth Platform → Clients** में पहले **Create OAuth client ID → Web application** चुनें। वास्तविक Web Client ID को project root की `local.properties` file में `googleWebClientId=YOUR_REAL_WEB_CLIENT_ID.apps.googleusercontent.com` के रूप में रखें। यह client ID secret नहीं है; client secret को APK में कभी न रखें।
+5. अब **Create OAuth client ID → Android** चुनें। Package name बिल्कुल `com.cube.channelonly` रखें। SHA-1 fingerprint उसी APK के signing certificate का होना चाहिए जिसे फोन में इंस्टॉल कर रहे हैं।
+6. यदि ऐप Testing mode में है, तो अपने Google खाते को Test users में जोड़ें; यह OAuth consent सेटअप के लिए है।
+   - **हर APK का SHA-1 अलग हो सकता है।** उसी CI build के `channelonly-oauth-build-metadata` artifact में `apk-signing-certificate.txt` देखें, या कंप्यूटर पर अपने डाउनलोड किए APK के लिए नीचे वाला `apksigner` कमांड चलाएँ। किसी पुराने run की fingerprint कॉपी न करें।
    - कंप्यूटर पर Android SDK उपलब्ध है तो APK की signing SHA-1 इस कमांड से देखें:
 
         apksigner verify --print-certs app-debug.apk
@@ -30,7 +31,7 @@
 
 - सुनिश्चित करें कि फोन में Google Play services मौजूद और अद्यतन हैं।
 - YouTube Data API v3 चालू है और OAuth consent screen पूरी की गई है।
-- Android OAuth client में package name `com.cube.channelonly` तथा installed APK की सही signing SHA-1 है।
+- Web OAuth client ID वास्तविक है और `local.properties` में `googleWebClientId` सेट है; Android OAuth client में package `com.cube.channelonly` तथा installed APK का सही signing SHA-1 है।
 - यदि ऐप Testing mode में है, तो लॉगिन करने वाला Google अकाउंट Test users में होना चाहिए।
 - इंटरनेट कनेक्शन जाँचें। अगर Google error दिखाता है कि ऐप unregistered है, तो package/SHA-1 और Cloud OAuth client की सेटिंग मिलाएँ।
 
