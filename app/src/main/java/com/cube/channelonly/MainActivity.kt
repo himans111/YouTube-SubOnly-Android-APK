@@ -566,7 +566,7 @@ private fun MainScreen(
                     MainTab.SEARCH -> SearchScreen(
                         query = searchText,
                         onQueryChange = { searchText = it },
-                        loading = searchLoading,
+                        loading = searchLoading || loading,
                         results = searchResults,
                         subscriptions = subscriptions,
                         message = message,
@@ -667,7 +667,7 @@ private fun SearchScreen(
         LazyColumn(Modifier.fillMaxSize()) {
             items(results, key = { it.channelId }) { channel ->
                 val existing = subscriptions.firstOrNull { it.channelId == channel.channelId }
-                ChannelRow(channel, isSubscribed = existing != null, onClick = { onToggleSubscription(channel) })
+                ChannelRow(channel, isSubscribed = existing != null, onClick = { onToggleSubscription(channel) }, enabled = !loading)
             }
         }
     }
@@ -690,7 +690,7 @@ private fun SubscriptionsScreen(
         if (message.isNotBlank()) Text(message, modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.primary)
         LazyColumn(Modifier.fillMaxSize()) {
             items(subscriptions, key = { it.channelId }) { channel ->
-                ChannelRow(channel, isSubscribed = true, onClick = { onUnsubscribe(channel) }, actionLabel = "Unsubscribe")
+                ChannelRow(channel, isSubscribed = true, onClick = { onUnsubscribe(channel) }, actionLabel = "Unsubscribe", enabled = !loading)
             }
         }
     }
@@ -718,7 +718,8 @@ private fun ChannelRow(
     channel: YTChannel,
     isSubscribed: Boolean,
     onClick: () -> Unit,
-    actionLabel: String = if (isSubscribed) "Subscribed" else "Subscribe"
+    actionLabel: String = if (isSubscribed) "Subscribed" else "Subscribe",
+    enabled: Boolean = true
 ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(
@@ -732,9 +733,9 @@ private fun ChannelRow(
             if (channel.description.isNotBlank()) Text(channel.description.take(80), style = MaterialTheme.typography.bodySmall, maxLines = 2)
         }
         if (isSubscribed && actionLabel == "Subscribed") {
-            OutlinedButton(onClick = onClick) { Text("Unsubscribe") }
+            OutlinedButton(onClick = onClick, enabled = enabled) { Text("Unsubscribe") }
         } else {
-            Button(onClick = onClick) { Text(actionLabel) }
+            Button(onClick = onClick, enabled = enabled) { Text(actionLabel) }
         }
     }
     Divider(color = MaterialTheme.colorScheme.surface)
