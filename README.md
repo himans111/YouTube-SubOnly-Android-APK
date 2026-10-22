@@ -44,7 +44,7 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Important notes
 
-- No Firebase API key, Firebase project ID, or Web client ID is required by this direct mobile OAuth implementation.
+- Firebase is not used. The Web OAuth client ID is required for Credential Manager's Google identity flow; the Android OAuth client and its matching package/signing certificate are required for YouTube authorization.
 - Google Cloud OAuth registration and enabling YouTube Data API v3 are required for private subscription data; a successful build does not prove the OAuth project is configured.
 - Never put passwords or access tokens in source control.
 - `player-origin-site/privacy.html` is a draft. Complete the actual operator, contact details, data practices, and account-deletion process before public release.
