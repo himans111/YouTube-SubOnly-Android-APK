@@ -1,6 +1,5 @@
 package com.cube.channelonly
 
-import android.accounts.Account
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.res.Configuration
@@ -76,37 +75,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.cube.channelonly.data.FirebaseSetup
 import com.cube.channelonly.data.YTChannel
 import com.cube.channelonly.data.YTVideo
 import com.cube.channelonly.data.YouTubeApi
 import com.cube.channelonly.ui.ChannelOnlyTheme
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.GetCredentialException
-import androidx.lifecycle.lifecycleScope
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
 import com.google.android.gms.common.api.Scope
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.auth.FirebaseUser
-import com.google.android.gms.tasks.Task
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.net.URLEncoder
 
 private const val YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
 
@@ -132,26 +113,14 @@ internal fun isUsablePlayerOrigin(value: String): Boolean {
     }
 }
 
-/** Pin YouTube authorization to the same device account only when the app session is Google-backed. */
-internal fun googleAccountEmailForYoutubeAuthorization(
-    email: String?,
-    providerIds: Collection<String>
-): String? {
-    val validEmail = email?.trim()?.takeIf { it.contains("@") && it.length <= 320 } ?: return null
-    return validEmail.takeIf { providerIds.any { providerId -> providerId == GoogleAuthProvider.PROVIDER_ID } }
-}
-
 class MainActivity : ComponentActivity() {
-    private var auth: FirebaseAuth? = null
-    private var currentUser by mutableStateOf<FirebaseUser?>(null)
     private var youtubeToken by mutableStateOf<String?>(null)
     private var youtubeConnectionMessage by mutableStateOf("YouTube not connected")
-    private var googleSignInMessage by mutableStateOf("")
-    private var googleSigningIn by mutableStateOf(false)
+    private var authorizationMessage by mutableStateOf("")
+    private var authorizationInProgress by mutableStateOf(false)
     private var playerVisibleForPip = false
     private var inPipMode by mutableStateOf(false)
     private val authorizationClient by lazy { Identity.getAuthorizationClient(this) }
-    private val credentialManager by lazy { CredentialManager.create(this) }
 
     private val authorizationLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
@@ -171,44 +140,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        auth = FirebaseSetup.initialize(this)
-        val existingUser = auth?.currentUser
-        currentUser = existingUser
-        auth?.addAuthStateListener { firebaseAuth -> currentUser = firebaseAuth.currentUser }
         setContent {
             ChannelOnlyTheme {
-                if (currentUser == null) {
+                if (youtubeToken == null) {
                     AuthScreen(
-                        firebaseConfigured = auth != null,
-                        googleSignInMessage = googleSignInMessage,
-                        googleSigningIn = googleSigningIn,
-                        onGoogleSignIn = { launchGoogleSignIn() },
-                        onSubmit = { email, password, createAccount ->
-                            val firebase = auth
-                            if (firebase == null) "Firebase is not configured. Follow README setup steps first."
-                            else try {
-                                val task = if (createAccount) firebase.createUserWithEmailAndPassword(email, password)
-                                else firebase.signInWithEmailAndPassword(email, password)
-                                firebaseTaskMessage(task)
-                            } catch (e: Exception) { e.localizedMessage ?: "Authentication failed" }
-                        },
-                        onForgotPassword = { email ->
-                            val firebase = auth
-                            if (firebase == null) "Firebase is not configured yet."
-                            else try { firebaseTaskMessage(firebase.sendPasswordResetEmail(email)) }
-                            catch (e: Exception) { e.localizedMessage ?: "Could not send reset email" }
-                        }
+                        isConnecting = authorizationInProgress,
+                        message = authorizationMessage,
+                        onContinueWithGoogle = { requestYoutubeAccess(allowInteractive = true) }
                     )
                 } else {
                     MainScreen(
-                        userEmail = currentUser?.email.orEmpty(),
-                        googleAccountSignedIn = googleAccountEmailForYoutubeAuthorization(
-                            currentUser?.email,
-                            currentUser?.providerData?.map { it.providerId }.orEmpty()
-                        ) != null,
+                        userEmail = "Google/YouTube account connected",
+                        googleAccountSignedIn = true,
                         token = youtubeToken,
                         connectionMessage = youtubeConnectionMessage,
-                        onConnectYoutube = { requestYoutubeAccess() },
+                        onConnectYoutube = { requestYoutubeAccess(allowInteractive = true) },
                         onDisconnectYoutube = {
                             updatePipEligibility(false)
                             disconnectYoutube()
@@ -217,23 +163,16 @@ class MainActivity : ComponentActivity() {
                         onPlayerVisibilityChanged = { visible -> updatePipEligibility(visible) },
                         onSignOut = {
                             updatePipEligibility(false)
-                            auth?.signOut()
-                            youtubeToken = null
-                            youtubeConnectionMessage = "YouTube not connected"
+                            disconnectYoutube()
                         }
                     )
                 }
             }
         }
-        // On app restart, silently reacquire an existing YouTube grant for the already-signed-in Google account.
-        // If consent is missing, keep the UI prompt; do not unexpectedly launch an account/consent screen.
-        val existingGoogleEmail = googleAccountEmailForYoutubeAuthorization(
-            existingUser?.email,
-            existingUser?.providerData?.map { it.providerId }.orEmpty()
-        )
-        if (existingGoogleEmail != null) {
-            requestYoutubeAccess(preferredAccountEmail = existingGoogleEmail, allowInteractive = false)
-        }
+
+        // If a previous YouTube grant exists, Google can return an access token without opening consent UI.
+        // If first-time consent is needed, this silent attempt leaves the user on the one-button Google login screen.
+        requestYoutubeAccess(allowInteractive = false)
     }
 
     private fun isConfiguredPlayerOrigin(): Boolean =
@@ -278,129 +217,60 @@ class MainActivity : ComponentActivity() {
         inPipMode = isInPictureInPictureMode
     }
 
-    private fun launchGoogleSignIn() {
-        if (auth == null) {
-            googleSignInMessage = "Set up your Firebase project before using Google sign-in."
-            return
-        }
-        val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
-        if (webClientId.isBlank() ||
-            !webClientId.endsWith(".apps.googleusercontent.com") ||
-            webClientId.contains("YOUR_", ignoreCase = true)
-        ) {
-            googleSignInMessage = "Google login setup needed: add googleWebClientId (Web application OAuth client ID) to local.properties."
-            return
-        }
+    private fun requestYoutubeAccess(allowInteractive: Boolean = true) {
+        if (authorizationInProgress) return
+        authorizationInProgress = true
+        authorizationMessage = ""
 
-        val googleOption = try {
-            GetSignInWithGoogleOption.Builder(webClientId)
-                .build()
-        } catch (e: Exception) {
-            googleSignInMessage = e.localizedMessage ?: "Google sign-in configuration is invalid."
-            return
-        }
-        val request = GetCredentialRequest.Builder()
-            .addCredentialOption(googleOption)
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(YOUTUBE_SCOPE)))
             .build()
 
-        googleSignInMessage = ""
-        googleSigningIn = true
-        lifecycleScope.launch {
-            try {
-                val response = credentialManager.getCredential(
-                    context = this@MainActivity,
-                    request = request
-                )
-                val credential = response.credential
-                if (credential is CustomCredential &&
-                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                ) {
-                    val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                    val firebase = auth
-                    if (firebase == null) {
-                        googleSigningIn = false
-                        googleSignInMessage = "Firebase is not configured. Add your real Firebase project values first."
-                    } else {
-                        val firebaseCredential = GoogleAuthProvider.getCredential(googleCredential.idToken, null)
-                        firebase.signInWithCredential(firebaseCredential).addOnCompleteListener { task ->
-                            googleSigningIn = false
-                            if (task.isSuccessful) {
-                                googleSignInMessage = "Google account connected. Approve YouTube access if asked."
-                                val signedInUser = task.result?.user
-                                val selectedGoogleEmail = googleAccountEmailForYoutubeAuthorization(
-                                    signedInUser?.email ?: googleCredential.id,
-                                    signedInUser?.providerData?.map { it.providerId }.orEmpty()
-                                        .ifEmpty { listOf(GoogleAuthProvider.PROVIDER_ID) }
-                                )
-                                requestYoutubeAccess(
-                                    preferredAccountEmail = selectedGoogleEmail,
-                                    allowInteractive = true
-                                )
-                            } else {
-                                googleSignInMessage = task.exception?.localizedMessage
-                                    ?: "Firebase Google sign-in failed. Check that Google is enabled in Firebase Authentication."
-                            }
-                        }
-                    }
-                } else {
-                    googleSigningIn = false
-                    googleSignInMessage = "Google returned an unsupported sign-in credential. Please try again."
-                }
-            } catch (e: GetCredentialException) {
-                googleSigningIn = false
-                googleSignInMessage = e.localizedMessage ?: "Google sign-in was cancelled or no Google account is available."
-            } catch (e: Exception) {
-                googleSigningIn = false
-                googleSignInMessage = e.localizedMessage ?: "Google sign-in failed. Please try again."
-            }
-        }
-    }
-
-    private fun requestYoutubeAccess(
-        preferredAccountEmail: String? = googleAccountEmailForYoutubeAuthorization(
-            currentUser?.email,
-            currentUser?.providerData?.map { it.providerId }.orEmpty()
-        ),
-        allowInteractive: Boolean = true
-    ) {
-        val requestBuilder = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(Scope(YOUTUBE_SCOPE)))
-        // Reuse the account selected in Continue with Google, while letting Google show the required consent UI.
-        preferredAccountEmail?.let { email ->
-            requestBuilder.setAccount(Account(email, "com.google"))
-        }
-        authorizationClient.authorize(requestBuilder.build())
+        authorizationClient.authorize(request)
             .addOnSuccessListener { result ->
                 if (result.hasResolution()) {
+                    authorizationInProgress = false
                     if (!allowInteractive) {
-                        youtubeConnectionMessage = "YouTube permission needs approval. Tap Continue with the same Google account to finish connecting."
+                        authorizationMessage = "Choose Continue with Google to select your YouTube account and approve access."
                         return@addOnSuccessListener
                     }
                     val pendingIntent = result.pendingIntent
                     if (pendingIntent == null) {
-                        youtubeConnectionMessage = "Google did not return a permission screen. Try again."
+                        authorizationMessage = "Google did not return the account/permission screen. Check Google Play services and try again."
                     } else {
-                        authorizationLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
+                        authorizationInProgress = true
+                        try {
+                            authorizationLauncher.launch(
+                                IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                            )
+                        } catch (e: Exception) {
+                            authorizationInProgress = false
+                            authorizationMessage = e.localizedMessage ?: "Could not open Google's authorization screen."
+                        }
                     }
                 } else {
+                    authorizationInProgress = false
                     acceptYoutubeToken(result.accessToken)
                 }
             }
             .addOnFailureListener { error ->
-                youtubeToken = null
-                youtubeConnectionMessage = "Could not connect YouTube: ${error.localizedMessage ?: "try again"}"
+                authorizationInProgress = false
+                authorizationMessage = "Google/YouTube login failed: ${error.localizedMessage ?: "check internet and Google Play services, then retry"}"
             }
     }
 
     private fun disconnectYoutube() {
+        // Return to the Google login screen immediately, then revoke this app's YouTube grant.
+        youtubeToken = null
+        authorizationMessage = ""
+        youtubeConnectionMessage = "YouTube not connected"
         val revokeRequest = RevokeAccessRequest.builder()
             .setScopes(listOf(Scope(YOUTUBE_SCOPE)))
             .build()
         authorizationClient.revokeAccess(revokeRequest)
             .addOnCompleteListener { task ->
-                youtubeToken = null
                 youtubeConnectionMessage = if (task.isSuccessful) {
-                    "YouTube permission disconnected"
+                    "YouTube access disconnected"
                 } else {
                     "Disconnected on this device. If needed, remove ChannelOnly from Google Account security settings."
                 }
@@ -408,39 +278,33 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun acceptYoutubeToken(token: String?) {
+        authorizationInProgress = false
         if (token.isNullOrBlank()) {
             youtubeToken = null
-            youtubeConnectionMessage = "Google returned no YouTube access token. Reconnect and accept the requested permission."
+            authorizationMessage = "Google returned no YouTube access token. Tap Continue with Google and approve the requested permission."
+            youtubeConnectionMessage = "YouTube not connected"
         } else {
+            authorizationMessage = ""
             youtubeToken = token
             youtubeConnectionMessage = "YouTube account connected"
         }
     }
 }
+}
 
 @Composable
 private fun AuthScreen(
-    firebaseConfigured: Boolean,
-    googleSignInMessage: String,
-    googleSigningIn: Boolean,
-    onGoogleSignIn: () -> Unit,
-    onSubmit: suspend (String, String, Boolean) -> String,
-    onForgotPassword: suspend (String) -> String
+    isConnecting: Boolean,
+    message: String,
+    onContinueWithGoogle: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    var createAccount by remember { mutableStateOf(false) }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                .padding(horizontal = 18.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -448,15 +312,14 @@ private fun AuthScreen(
                 modifier = Modifier.fillMaxWidth().widthIn(max = 460.dp),
                 shape = RoundedCornerShape(26.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 3.dp
+                shadowElevation = 8.dp
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Surface(
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(48.dp),
                         shape = CircleShape,
                         color = Color(0xFF272727)
                     ) {
@@ -469,142 +332,63 @@ private fun AuthScreen(
                             )
                         }
                     }
-                    Spacer(Modifier.height(7.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         "ChannelOnly",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(5.dp))
                     Text(
-                        if (createAccount) "Create your account" else "Sign in to continue",
+                        "Your subscriptions. Your feed.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Email address") },
-                        placeholder = { Text("you@example.com") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    Spacer(Modifier.height(18.dp))
+                    Text(
+                        "Continue with the Google account you use for YouTube. On the first sign-in, Google will ask you to approve access to your YouTube subscriptions.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Password") },
-                        placeholder = { Text("At least 6 characters") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(
-                            enabled = email.contains("@") && !busy && !googleSigningIn && firebaseConfigured,
-                            onClick = {
-                                busy = true
-                                message = ""
-                                scope.launch {
-                                    message = onForgotPassword(email.trim())
-                                    busy = false
-                                }
-                            }
-                        ) { Text("Forgot password?") }
-                    }
+                    Spacer(Modifier.height(18.dp))
                     Button(
-                        enabled = !busy && !googleSigningIn && email.contains("@") && password.length >= 6 && firebaseConfigured,
-                        onClick = {
-                            busy = true
-                            message = ""
-                            scope.launch {
-                                message = onSubmit(email.trim(), password, createAccount)
-                                busy = false
-                            }
-                        },
+                        onClick = onContinueWithGoogle,
+                        enabled = !isConnecting,
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        if (busy) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text(if (createAccount) "Create account" else "Log in")
-                        }
-                    }
-                    TextButton(
-                        enabled = !busy && !googleSigningIn,
-                        onClick = { createAccount = !createAccount; message = "" }
-                    ) {
-                        Text(if (createAccount) "Already have an account? Sign in" else "New here? Create an account")
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Divider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
-                        Text("OR", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
-                        Divider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = onGoogleSignIn,
-                        enabled = !busy && !googleSigningIn,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
-                    ) {
-                        if (googleSigningIn) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        if (isConnecting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
                             Spacer(Modifier.size(10.dp))
                             Text("Connecting to Google…")
                         } else {
-                            Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                            Spacer(Modifier.size(12.dp))
+                            Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.size(10.dp))
                             Text("Continue with Google")
                         }
                     }
-                    if (!firebaseConfigured) {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Setup needed: configure Firebase and enable Email/Password + Google sign-in.",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    val visibleMessage = when {
-                        googleSignInMessage.isNotBlank() -> googleSignInMessage
-                        message.isNotBlank() -> message
-                        else -> ""
-                    }
-                    if (visibleMessage.isNotBlank()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            visibleMessage,
-                            color = MaterialTheme.colorScheme.secondary,
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(
-                        "Continue with Google will use the selected Google account for YouTube too. Google may ask you to approve YouTube access; ChannelOnly never asks for your Google password.",
+                        "No Firebase account or Google password is needed inside this app. Google may still show its official account picker or permission screen.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
                     )
+                    if (message.isNotBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
