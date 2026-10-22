@@ -25,11 +25,6 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "FIREBASE_API_KEY", asBuildConfigString(localValue("firebaseApiKey")))
-        buildConfigField("String", "FIREBASE_APP_ID", asBuildConfigString(localValue("firebaseAppId")))
-        buildConfigField("String", "FIREBASE_PROJECT_ID", asBuildConfigString(localValue("firebaseProjectId")))
-        buildConfigField("String", "FIREBASE_SENDER_ID", asBuildConfigString(localValue("firebaseSenderId")))
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", asBuildConfigString(localValue("googleWebClientId")))
         buildConfigField("String", "PLAYER_ORIGIN", asBuildConfigString(localValue("playerOrigin")))
     }
 
@@ -67,13 +62,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
-    implementation("com.google.firebase:firebase-auth")
 
     implementation("com.google.android.gms:play-services-auth:21.4.0")
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
