@@ -50,3 +50,5 @@ Show a specific Google Cloud Android OAuth package/SHA-1 setup hint for status c
 
 
 Final validation: sign in using Credential Manager first, pin YouTube authorization to the selected Google account, require a user-provided Web OAuth client ID, test its format, make CI trigger on app/config changes, and publish the exact APK signer fingerprint/SHA-256. Emulator checks do not represent a live Google account test.
+
+Refresh PR validation after enabling pull_request workflow trigger on main; build current branch source and publish APK plus signing metadata.
