@@ -1,47 +1,31 @@
 # ChannelOnly build status
 
-## Latest validated build
+## Latest fully validated source/build
 
 - Repository: https://github.com/himans111/YouTube-SubOnly-Android-APK
-- Latest completed full validation: [GitHub Actions run #40](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39731888585), conclusion **success**, workflow snapshot `6184bd7a7b2d33dafd7c1d6985c4c80178bb1cda`.
-- Passed: Gradle unit tests, debug APK build, emulator boot, APK installation, activity launch/process/crash-log checks, and login-screen screenshot capture/upload.
-- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12404569335`; extracted APK size 20,522,376 bytes, SHA-256 `5be92f72dd468315537a46725d70a9e922f446748f16d6277ee5dc360c4e9d36`.
-- Latest login screenshot artifact: `channelonly-login-screen`, artifact ID `12405855721`; emulator screenshot captured from a 1080 × 1920 Android virtual device.
-- Google account flow: after Continue with Google succeeds, YouTube authorization is requested using the same selected Google account; if YouTube consent is already granted, the access token is returned without launching another consent screen. On app startup the app silently attempts to reacquire a prior grant; if consent is missing, it leaves a visible same-account connect action.
-- Email/Password login remains available. App does not read Gmail. YouTube permission is a separate Google OAuth grant from Firebase app sign-in and may require consent the first time.
-- Unit tests cover choosing a YouTube authorization account only for Google-backed sessions and rejecting missing/invalid addresses, in addition to feed filtering/deduplication and player-origin validation.
-- Emulator smoke test only verifies install/launch and immediate process stability. It does not validate live Firebase authentication, Google OAuth consent, YouTube account/API actions, embedded playback, or PiP on a physical device.
-- Real Firebase values/providers, a valid Google Web OAuth client/Android OAuth setup, and a real HTTPS player origin for embedded playback/PiP remain necessary. `player-origin-site/privacy.html` is still a draft; complete the real operator, contact, data-practices and account-deletion details before public release.
+- Latest completed CI run: [GitHub Actions run #43](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39734838858)
+- Tested source commit: `dc690cc8a7b16de980ff45409f60ac5aa46dfd17`
+- Passed: Gradle unit tests, debug APK assembly, Android emulator boot, APK installation, app launch/process stability/crash-log inspection, and 1080 × 1920 login-screen screenshot capture.
+- Downloaded APK size: 18,899,222 bytes. SHA-256: `12fd81e9a73eea7661023192d25e28a40c2fb35b53090366161a4d605a80f273`.
+- APK package: `com.cube.channelonly`; minimum Android version API 26 (Android 8.0).
+- SHA-1 signing-certificate fingerprint for this exact APK: `25:C9:62:9A:18:5A:E3:41:08:19:65:BE:D7:06:9C:B3:E8:5A:8C:D9`. Register this package name and SHA-1 as an Android OAuth client in Google Cloud if you want this exact APK to access YouTube. A different build/signing certificate may need a different client fingerprint.
+- Login architecture: direct Google Android AuthorizationClient → YouTube OAuth. There is no Firebase authentication, no separate ChannelOnly account, no web client ID, and the app does not scan Gmail or request the Google password.
+- Access token is held in app memory. On app launch, the app silently tries to reacquire a previous YouTube authorization; when new consent is required, the login button opens Google's official account/permission flow.
+- YouTube Data API features implemented: list subscription pages, search channels, subscribe/unsubscribe, load recent uploads from subscribed channels, client-side channel-ID filtering, and duplicate-video removal.
+- Embedded player is enabled only with a valid HTTPS origin set in local `local.properties`; otherwise the app opens the video in YouTube. PiP is available only when the embedded player/origin are configured and the device/player allow it.
+- Important validation limit: CI verifies build/tests/install/launch, not a successful real Google OAuth consent or live YouTube API request. The current emulator screenshot displays the setup hint because the CI build's package/SHA-1 is not registered in a personal Google Cloud project and YouTube Data API/consent setup are not supplied.
+- `player-origin-site/privacy.html` is a draft and must be completed with the actual operator, contact, age/data practices, retention and user-control information before public release.
 - This is a debug APK, not a signed production release.
 
-## Application logic improvements
+## Remaining user-account setup
 
-- The subscribed feed uses all subscription IDs returned by the YouTube API (not just the first 50), gets up to five recent uploads per subscribed channel, and makes playlist calls in groups of five concurrent requests.
-- The client performs a final channel-ID filter and removes duplicate video IDs.
-- Deleted/unavailable playlists (HTTP 404) are skipped, while authentication/quota/server errors are surfaced to the user rather than silently swallowed.
-- Unit tests cover channel ID preservation, filtering out non-subscribed videos, and duplicate-video removal.
+1. In Google Cloud Console enable YouTube Data API v3 and finish Google Auth Platform consent/branding settings; add the Google account as a test user if the app is in Testing mode.
+2. Create an Android OAuth client with package `com.cube.channelonly` and SHA-1 shown above for this exact APK.
+3. Install the APK and test account selection, consent, feed, channel search, subscribe/unsubscribe, disconnect/reconnect, and token reauthorization on a real phone.
+4. For embedded playback/PiP, publish `player-origin-site/` to a real HTTPS origin you control and set `playerOrigin` locally. Complete the real privacy policy before any public release.
 
-## Emulator issue and fix
+## Emulator workflow notes
 
-- Earlier hosted-runner attempts failed because the x86_64 emulator needed hardware acceleration but the runner user could not access `/dev/kvm`.
-- The workflow now attempts to grant the ephemeral runner user access to `/dev/kvm`. If KVM still is unavailable, it opts in to slow software emulation with `ANDROID_I_WANT_MY_TCG=yes` and `-accel off`.
-- All ADB operations in the latest workflow have explicit timeouts and boot diagnostics to avoid indefinite waits.
-- The corrected workflow completed its boot and app launch checks successfully in run #28.
-
-## Implemented behavior
-
-- Firebase Email/Password account screen (requires real Firebase project values).
-- Separate Google authorization for YouTube Data API access.
-- Search for channels and subscribe/unsubscribe.
-- Home feed limited to recent uploads from the authorized YouTube account's subscriptions, with a final client-side channel-ID guard.
-- Embedded YouTube player when an actual HTTPS player origin is configured; otherwise an Open in YouTube fallback.
-- Android Picture-in-Picture (PiP) request for the embedded player when leaving the app. Actual PiP/background playback remains subject to Android device and YouTube player/account restrictions.
-
-## Items requiring real project details before personal-account testing or public release
-
-- Firebase API key, app ID, project ID and sender ID must be supplied in local `local.properties`, and Email/Password sign-in must be enabled in Firebase Console.
-- Google Cloud needs YouTube Data API v3 enabled, consent/testing configuration, and an Android OAuth client for package `com.cube.channelonly` with the correct signing SHA-1.
-- Embedded playback/PiP requires publishing `player-origin-site/` to an HTTPS origin controlled by the developer and setting `playerOrigin` locally.
-- `player-origin-site/privacy.html` is still a draft: the actual operator name, support contact, account-deletion process and real data practices cannot be invented. Complete it before public release.
-- Never commit `local.properties`, access tokens, passwords, or signing secrets. Automated launch validation does not verify Firebase login, live Google OAuth, YouTube quota, playback or PiP on a real physical device.
-- This is a debug APK, not a signed production release.
+- The workflow uses Android API 30 Google APIs x86_64 emulator and tries KVM before falling back to explicitly opted-in software emulation.
+- Emulator smoke test is not a substitute for real Google OAuth or YouTube account testing.
+- ADB waits have timeouts and failure diagnostics; debug APK and screenshot artifacts are uploaded by GitHub Actions.
