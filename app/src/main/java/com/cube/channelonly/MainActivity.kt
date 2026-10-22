@@ -12,6 +12,11 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.lifecycle.lifecycleScope
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
@@ -84,6 +89,8 @@ import com.cube.channelonly.data.YTVideo
 import com.cube.channelonly.data.YouTubeApi
 import com.cube.channelonly.ui.ChannelOnlyTheme
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
 import com.google.android.gms.common.api.ApiException
@@ -91,6 +98,8 @@ import com.google.android.gms.common.api.Scope
 import kotlinx.coroutines.launch
 
 private const val YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
+private const val IDENTITY_PREFS = "channelonly_identity"
+private const val GOOGLE_EMAIL_KEY = "google_account_email"
 
 /** One shared origin check keeps embedded playback and PiP eligibility consistent. */
 internal fun isUsablePlayerOrigin(value: String): Boolean {
@@ -114,8 +123,17 @@ internal fun isUsablePlayerOrigin(value: String): Boolean {
     }
 }
 
+internal fun isConfiguredGoogleWebClientId(value: String): Boolean {
+    val clientId = value.trim()
+    return Regex("^[0-9]+-[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com$").matches(clientId) &&
+        !clientId.contains("YOUR_CLIENT_ID", ignoreCase = true) &&
+        !clientId.contains("REPLACE", ignoreCase = true)
+}
+
 class MainActivity : ComponentActivity() {
+    private var signedInGoogleEmail by mutableStateOf<String?>(null)
     private var youtubeToken by mutableStateOf<String?>(null)
+    private val credentialManager by lazy { CredentialManager.create(this) }
     private var youtubeConnectionMessage by mutableStateOf("YouTube not connected")
     private var authorizationMessage by mutableStateOf("")
     private var authorizationInProgress by mutableStateOf(false)
@@ -144,18 +162,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        signedInGoogleEmail = getSharedPreferences(IDENTITY_PREFS, MODE_PRIVATE)
+            .getString(GOOGLE_EMAIL_KEY, null)
         setContent {
             ChannelOnlyTheme {
                 if (youtubeToken == null) {
                     AuthScreen(
                         isConnecting = authorizationInProgress,
                         message = authorizationMessage,
-                        onContinueWithGoogle = { requestYoutubeAccess(allowInteractive = true) }
+                        onContinueWithGoogle = { signInWithGoogle() }
                     )
                 } else {
                     MainScreen(
-                        userEmail = "Google/YouTube account connected",
-                        googleAccountSignedIn = true,
+                        userEmail = signedInGoogleEmail ?: "Google account signed in",
+                        googleAccountSignedIn = signedInGoogleEmail != null,
                         token = youtubeToken,
                         connectionMessage = youtubeConnectionMessage,
                         onConnectYoutube = { requestYoutubeAccess(allowInteractive = true) },
@@ -174,9 +194,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // If a previous YouTube grant exists, Google can return an access token without opening consent UI.
-        // If first-time consent is needed, this silent attempt leaves the user on the one-button Google login screen.
-        requestYoutubeAccess(allowInteractive = false)
+        // AuthorizationClient returns a token, not user identity. Only restore a grant
+        // after this app has recorded the account selected through Credential Manager.
+        if (!signedInGoogleEmail.isNullOrBlank()) {
+            requestYoutubeAccess(allowInteractive = false)
+        }
     }
 
     private fun isConfiguredPlayerOrigin(): Boolean =
