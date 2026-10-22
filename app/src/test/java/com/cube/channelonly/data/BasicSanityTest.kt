@@ -1,6 +1,8 @@
 package com.cube.channelonly.data
 
+import com.cube.channelonly.googleAccountEmailForYoutubeAuthorization
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class BasicSanityTest {
@@ -20,5 +22,21 @@ class BasicSanityTest {
         val one = YTVideo("abc123", "A title", "UC_allowed", "Allowed", "", "2026-01-01")
         val duplicate = one.copy(title = "Duplicate title")
         assertEquals(1, filterSubscribedVideos(listOf(one, duplicate), setOf("UC_allowed")).size)
+    }
+
+    @Test fun youtubeAuthorizationUsesEmailFromGoogleBackedSession() {
+        assertEquals(
+            "person@gmail.com",
+            googleAccountEmailForYoutubeAuthorization(" person@gmail.com ", listOf("firebase", "google.com"))
+        )
+    }
+
+    @Test fun youtubeAuthorizationDoesNotPinAnEmailPasswordOnlySessionToGoogle() {
+        assertNull(googleAccountEmailForYoutubeAuthorization("person@example.com", listOf("password")))
+    }
+
+    @Test fun youtubeAuthorizationRejectsMissingOrInvalidEmail() {
+        assertNull(googleAccountEmailForYoutubeAuthorization(null, listOf("google.com")))
+        assertNull(googleAccountEmailForYoutubeAuthorization("not-an-email", listOf("google.com")))
     }
 }
