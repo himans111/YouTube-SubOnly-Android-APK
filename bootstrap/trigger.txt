@@ -43,3 +43,5 @@ Unify player-origin validation for embedded playback and PiP eligibility; add un
 Reuse the Google account selected at ChannelOnly sign-in for YouTube OAuth, prompt for YouTube consent immediately on first Google sign-in, silently reacquire prior grants at app restart without unexpectedly launching a consent screen, and add unit tests for provider-linked account selection. Run Gradle unit tests, APK build, emulator smoke test, and login screenshot capture.
 
 Remove Firebase entirely and make Continue with Google use Android AuthorizationClient directly for YouTube OAuth; keep same-grant silent authorization on restart. Run all unit tests, build debug APK, emulator install/launch smoke test, and capture the direct-Google login screenshot.
+
+Fix the stale Firebase Task helper discovered by direct-OAuth compilation; rerun unit tests, debug APK build, emulator launch, and screenshot capture.
