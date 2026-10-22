@@ -1,65 +1,72 @@
-# ChannelOnly सेटअप गाइड (हिन्दी)
+# ChannelOnly सेटअप गाइड — बिना Firebase के
 
-यह guide app को अपने accounts/configuration के साथ चलाने के लिए है। सिर्फ APK build हो जाना Firebase या YouTube login के सक्रिय होने का प्रमाण नहीं है।
+इस ऐप में अलग ChannelOnly अकाउंट नहीं है। यह सीधे Google की Android authorization प्रक्रिया से YouTube अकाउंट चुनता है। **Firebase प्रोजेक्ट, Firebase API key या Web OAuth Client ID की जरूरत नहीं है।** फिर भी Google Cloud में Android OAuth client और YouTube Data API v3 सक्षम करना जरूरी है।
 
-## 1. Firebase Email/Password और Google login
+## 1. Google Cloud का एक बार का सेटअप
 
-1. Firebase Console में project बनाएँ और Android app register करें।
-2. Android package name बिल्कुल यह रखें: `com.cube.channelonly`।
-3. Firebase Authentication → Sign-in method में **Email/Password** और **Google** दोनों providers enable करें। Google provider में support email चुनकर Save करें।
-4. Project settings → General → Your apps से API key, App ID, Project ID और Project number/Sender ID लें।
-5. Android project root में `local.properties` खोलें। अगर उसमें `sdk.dir` पहले से है, तो उसे हटाएँ नहीं। `local.properties.example` के placeholder values को अपनी Firebase values से बदलें। उदाहरण:
+1. [Google Cloud Console](https://console.cloud.google.com/) खोलें और नया प्रोजेक्ट बनाएँ या अपना मौजूदा प्रोजेक्ट चुनें।
+2. **APIs & Services → Library** में जाकर **YouTube Data API v3** सक्षम करें।
+3. **Google Auth Platform → Branding** में ऐप का नाम और आवश्यक संपर्क जानकारी भरें। अगर Consent/Audience Testing mode में है, तो अपने Google खाते को Test users में जोड़ें।
+4. **Google Auth Platform → Clients** या **APIs & Services → Credentials** में **Create OAuth client ID → Android** चुनें।
+5. Package name बिल्कुल `com.cube.channelonly` रखें। SHA-1 fingerprint उसी APK के signing certificate का होना चाहिए जिसे फोन में इंस्टॉल कर रहे हैं.
+   - कंप्यूटर पर Android SDK उपलब्ध है तो APK की signing SHA-1 इस कमांड से देखें:
 
-        firebaseApiKey=YOUR_REAL_FIREBASE_WEB_API_KEY
-        firebaseAppId=1:YOUR_SENDER_ID:android:YOUR_REAL_APP_ID
-        firebaseProjectId=YOUR_FIREBASE_PROJECT_ID
-        firebaseSenderId=YOUR_SENDER_ID
-        googleWebClientId=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
-        playerOrigin=
+        apksigner verify --print-certs app-debug.apk
 
-   `googleWebClientId` Google Cloud में बने **Web application OAuth client** का Client ID है, Android OAuth Client ID नहीं। Placeholder values को जस का तस छोड़ने पर login configure नहीं होगा।
-6. App rebuild/install करें और email/password login, Google login, sign-out तथा password reset जाँचें। **Continue with Google** से sign-in करने पर ऐप चुने गए उसी Google खाते से YouTube authorization माँगेगा। पहली बार Google को YouTube subscription access की अनुमति देनी पड़ सकती है; यह दूसरा password login नहीं है। आगे ऐप खुलने पर पहले से दी गई YouTube अनुमति को चुपचाप फिर से प्राप्त करने की कोशिश होगी। यदि अनुमति अभी तक नहीं दी गई है, तो ऐप में दिखने वाला **Continue with the same Google account** बटन दबाएँ। Email/Password से sign-in करने वालों के लिए YouTube को अलग से जोड़ने का विकल्प रहेगा। ऐप Gmail inbox को scan नहीं करता।
+   - अलग build या Play Store से इंस्टॉल किए गए APK का certificate fingerprint अलग हो सकता है; उसी APK के सही SHA-1 के साथ Android OAuth client बनाएँ।
+6. बदलाव Google Cloud में सेव होने के बाद ऐप खोलकर Google लॉगिन जाँचें।
 
-## 2. YouTube API और Google authorization
+## 2. ऐप में Google/YouTube लॉगिन
 
-1. Google Cloud Console में intended project खोलें और YouTube Data API v3 enable करें।
-2. Google Cloud → APIs & Services → Credentials में **OAuth 2.0 Client ID → Web application** बनाएं। उसका Client ID `googleWebClientId` में डालें। यह **Web client ID** है, Android client ID नहीं। अगर consent screen testing mode में है, तो अपने Google account को test user के रूप में जोड़ें।
-3. अलग से Android OAuth client बनाएँ जिसमें package name `com.cube.channelonly` और सही debug-signing SHA-1 हो। SHA-1 निकालने के लिए project root में चलाएँ:
+1. ChannelOnly खोलें और **Continue with Google** दबाएँ।
+2. वही Google अकाउंट चुनें जिसका YouTube इस्तेमाल करते हैं।
+3. पहली बार Google YouTube access की अनुमति माँग सकता है। अनुमति स्क्रीन में दिखाई गई subscription permissions पढ़कर स्वीकार करें।
+4. अनुमति सफल होने पर ऐप आपके YouTube subscriptions लोड करेगा। Home feed केवल उन्हीं सब्सक्राइब किए चैनलों के हाल के वीडियो दिखाने के लिए फ़िल्टर करता है।
+5. ऐप बंद करके दोबारा खोलने पर यह पहले से मिली अनुमति से access token पाने की कोशिश करता है। यदि Google अनुमति रद्द हो चुकी हो, session expire हुआ हो या फिर पुष्टि जरूरी हो, तो अनुमति दोबारा माँगी जा सकती है।
+6. ऐप Google password नहीं माँगता और Gmail inbox scan नहीं करता। Firebase या अलग ChannelOnly account की जरूरत नहीं है।
 
-        ./gradlew signingReport
+## 3. अगर Google लॉगिन काम न करे
 
-   अगर checkout में Gradle wrapper उपलब्ध न हो, तो installed Gradle से gradle signingReport चलाएँ या Android Studio के Gradle task panel में signingReport चुनें।
-4. Login स्क्रीन पर email/password या **Continue with Google** में से किसी एक से ChannelOnly account में sign-in करें। Google sign-in के लिए Firebase Google provider enabled और `googleWebClientId` सही होना चाहिए। Google से sign-in चुनने पर app उसी चुने हुए Google खाते से YouTube permission की request करेगा; पहली बार consent स्वीकार करना होगा। बाद में ऐप पहले से दी गई अनुमति पाने की कोशिश करेगा, जिससे हर बार password या account selection की जरूरत नहीं होनी चाहिए। Email/password login के लिए YouTube जोड़ने हेतु app का **Connect YouTube with Google** बटन इस्तेमाल करें। App में अपना Google password कभी न लिखें।
-5. Home feed, channel search और subscribe/unsubscribe को वास्तविक account के साथ जाँचें। API quota, Google consent और account-level restrictions की वजह से requests फिर भी fail हो सकती हैं।
+- सुनिश्चित करें कि फोन में Google Play services मौजूद और अद्यतन हैं।
+- YouTube Data API v3 चालू है और OAuth consent screen पूरी की गई है।
+- Android OAuth client में package name `com.cube.channelonly` तथा installed APK की सही signing SHA-1 है।
+- यदि ऐप Testing mode में है, तो लॉगिन करने वाला Google अकाउंट Test users में होना चाहिए।
+- इंटरनेट कनेक्शन जाँचें। अगर Google error दिखाता है कि ऐप unregistered है, तो package/SHA-1 और Cloud OAuth client की सेटिंग मिलाएँ।
 
-## 3. Embedded player और Picture-in-Picture (PiP)
+## 4. YouTube feed और channel management
 
-PiP केवल तब request होगा जब embedded-player origin configure किया गया हो और आप video player screen पर हों। YouTube/Android playback restrictions के कारण PiP या background playback हर device/account पर guaranteed नहीं है।
+- Search में चैनल ढूँढकर Subscribe/Unsubscribe करें।
+- Home feed में केवल YouTube API द्वारा लौटाए गए subscribed channel IDs के वीडियो दिखते हैं; ऐप अंतिम client-side channel-ID filter भी लगाता है।
+- YouTube Data API quota और Google OAuth account restrictions लागू हो सकते हैं।
+- permission हटानी हो, तो Account menu में Disconnect करें; Google Account की security settings से भी ऐप का access हटाया जा सकता है।
 
-1. player-origin-site/ की static files को ऐसी HTTPS website पर publish करें जिसे आप control करते हैं।
-2. Root local.properties में playerOrigin को origin मात्र रखें, path या file name नहीं। उदाहरण के तौर पर:
+## 5. Embedded player और Picture-in-Picture (PiP)
 
-        playerOrigin=https://your-real-domain.example
+1. `player-origin-site/` की static files को ऐसी HTTPS वेबसाइट पर publish करें जिसे आप नियंत्रित करते हैं।
+2. Project root में `local.properties` बनाएँ या खोलें। Android Studio द्वारा मौजूद `sdk.dir` पंक्ति हटाएँ नहीं।
+3. केवल origin सेट करें, path या file name नहीं:
 
-   यह example domain है; इसे अपनी live HTTPS domain से बदलें।
-3. Rebuild/install करें। Subscribed feed में video खोलें, playback manually start करें और Android Home gesture/button से बाहर जाएँ। Compatible device पर PiP window आने की जाँच करें।
-4. Origin configure न होने पर app “Open in YouTube” fallback दिखाता है और in-app PiP request नहीं करेगा।
+        playerOrigin=https://your-live-domain.example
 
-## 4. Build और automated tests
+   ऊपर वाला domain सिर्फ उदाहरण है। उसे अपनी वास्तविक HTTPS website से बदलें।
+4. APK rebuild/install करें। Feed में वीडियो खोलें, playback शुरू करें और Android Home gesture/button से बाहर जाएँ।
+5. सही configuration और समर्थित device पर PiP आ सकता है। YouTube/Android playback restrictions के कारण PiP या background playback हर device/account पर guaranteed नहीं है।
+6. Origin खाली होने पर ऐप “Open in YouTube” विकल्प दिखाता है और in-app PiP request नहीं करता।
 
-Project root में चलाएँ:
+## 6. Build और automated tests
 
-        gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+Project root से चलाएँ:
 
-या Android Studio से Gradle sync कराकर test/build tasks चलाएँ। Debug APK output path:
+        ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
+
+Debug APK यहाँ बनता है:
 
         app/build/outputs/apk/debug/app-debug.apk
 
-GitHub Actions run और APK artifacts repository के Actions tab में दिखते हैं। Hosted runner का emulator smoke test धीमा हो सकता है; build/tests और emulator result को अलग-अलग देखें।
+GitHub Actions पर unit tests, build, emulator install/launch और login-screen screenshot की जाँच की जाती है। Emulator smoke test असली Google login या YouTube API access प्रमाणित नहीं करता।
 
-## 5. Privacy और release readiness
+## 7. Release से पहले
 
-- local.properties को Git में commit न करें। Firebase values, Google access tokens और passwords भी source control में न रखें।
-- player-origin-site/privacy.html अभी draft है। Public release से पहले operator name, support email, date, account deletion प्रक्रिया और actual data practices भरें।
-- Debug APK production release नहीं है। Real device पर authentication, channel search, subscription changes, network failures, playback, PiP, orientation, accessibility और privacy policy जाँचें।
-- YouTube embedded player के controls/related-video UI को यह app बदलता नहीं है; app की तरफ़ से मुख्य restriction home-feed channel filtering है।
+- `player-origin-site/privacy.html` अभी draft है। वास्तविक ऐप ऑपरेटर, support contact, डेटा उपयोग, retention और account-deletion प्रक्रिया डालें।
+- Debug APK production release नहीं है। Real Android device पर Google authorization, subscription feed, subscribe/unsubscribe, network errors, playback, PiP और account-disconnect जाँचें।
+- Passwords या OAuth access tokens को GitHub में commit न करें।
