@@ -45,3 +45,5 @@ Reuse the Google account selected at ChannelOnly sign-in for YouTube OAuth, prom
 Remove Firebase entirely and make Continue with Google use Android AuthorizationClient directly for YouTube OAuth; keep same-grant silent authorization on restart. Run all unit tests, build debug APK, emulator install/launch smoke test, and capture the direct-Google login screenshot.
 
 Fix the stale Firebase Task helper discovered by direct-OAuth compilation; rerun unit tests, debug APK build, emulator launch, and screenshot capture.
+
+Show a specific Google Cloud Android OAuth package/SHA-1 setup hint for status code 10 or caller-not-whitelisted errors; validate this message with unit tests, APK build, emulator launch, and screenshot.
