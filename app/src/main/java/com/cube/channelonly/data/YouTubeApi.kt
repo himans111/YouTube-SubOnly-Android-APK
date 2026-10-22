@@ -50,8 +50,7 @@ private fun defaultYouTubeHttpClient(): OkHttpClient = OkHttpClient.Builder()
 class YouTubeApi(
     private val baseUrl: HttpUrl = HttpUrl.Builder().scheme("https").host(API_HOST).build(),
     private val client: OkHttpClient = defaultYouTubeHttpClient()
-)
-
+) {
     private suspend fun request(
         token: String,
         path: String,
