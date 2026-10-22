@@ -600,7 +600,7 @@ private fun AuthScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "After login, connect YouTube to load your subscriptions.",
+                        "Continue with Google will use the selected Google account for YouTube too. Google may ask you to approve YouTube access; ChannelOnly never asks for your Google password.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
