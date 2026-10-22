@@ -54,3 +54,5 @@ Final validation: sign in using Credential Manager first, pin YouTube authorizat
 Refresh PR validation after enabling pull_request workflow trigger on main; build current branch source and publish APK plus signing metadata.
 
 Final OAuth validation pass: use Google AuthorizationClient's explicit account picker and YouTube scope consent in one flow, do not require a Web OAuth client ID, and rerun unit tests, debug APK build, signature/hash check, and emulator launch. Live YouTube access still requires the user's own Android OAuth registration and YouTube Data API configuration.
+
+Run mocked YouTube API regression tests against a local MockWebServer: verify OAuth bearer headers, subscriptions pagination/deduplication, channel search, subscribe/unsubscribe request methods/bodies, subscribed feed filtering, and API error diagnostics. CI emulator checks remain distinct from real-account OAuth testing.
