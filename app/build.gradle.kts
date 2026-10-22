@@ -26,6 +26,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "PLAYER_ORIGIN", asBuildConfigString(localValue("playerOrigin")))
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", asBuildConfigString(localValue("googleWebClientId")))
     }
 
     buildFeatures {
@@ -64,6 +65,9 @@ dependencies {
 
 
     implementation("com.google.android.gms:play-services-auth:21.4.0")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
