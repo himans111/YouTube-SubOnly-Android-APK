@@ -392,3 +392,312 @@ jobs:
             ${{ runner.temp }}/logcat.txt
           if-no-files-found: ignore
           retention-days: 7
+ "$PROJECT_DIR/local.properties" >/dev/null 2>&1; then WEB_CLIENT_CONFIGURED=yes; else WEB_CLIENT_CONFIGURED=no; fi
+          {
+            echo "git_commit=$GITHUB_SHA"
+            echo "package_name=com.cube.channelonly"
+            echo "build_variant=debug"
+            echo "google_web_client_id_configured=$WEB_CLIENT_CONFIGURED"
+            echo "real_account_auth_tested=no"
+          } > "$OUT/build-info.txt"
+          cat "$OUT/build-info.txt"
+      - name: Create and boot a lightweight Android emulator
+        shell: bash
+        env:
+          ANDROID_AVD_HOME: ${{ runner.temp }}/.android/avd
+        run: |
+          set -euo pipefail
+          SDK_ROOT="$ANDROID_SDK_ROOT"
+          mkdir -p "$ANDROID_AVD_HOME"
+          export ANDROID_AVD_HOME
+          AVDMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)"
+          test -x "$AVDMANAGER" || { echo "::error::avdmanager executable not found"; exit 1; }
+          printf 'no\n' | "$AVDMANAGER" create avd --force --name channelonly_ci --package "system-images;android-30;google_apis;x86_64" --device pixel_2
+          # Some hosted runner images expose /dev/kvm but omit the runner user from its ACL.
+          # Try granting this ephemeral runner process access before dropping to slow software mode.
+          if [ -c /dev/kvm ] && { [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; }; then
+            sudo setfacl -m "u:$(id -un):rw" /dev/kvm 2>/dev/null || sudo chmod a+rw /dev/kvm 2>/dev/null || true
+          fi
+          if [ -c /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+            EMULATOR_ACCEL_ARGS=(-accel on)
+            echo "KVM is available to the runner; using hardware-accelerated x86_64 emulation."
+          else
+            # Android Emulator requires this opt-in to run the x86_64 guest without KVM.
+            export ANDROID_I_WANT_MY_TCG=yes
+            EMULATOR_ACCEL_ARGS=(-accel off)
+            echo "::warning::KVM remains unavailable; using very slow software CPU emulation."
+          fi
+          nohup "$SDK_ROOT/emulator/emulator" -avd channelonly_ci "${EMULATOR_ACCEL_ARGS[@]}" -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -camera-back none > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          EMULATOR_PID=$!
+          echo "$EMULATOR_PID" > "$RUNNER_TEMP/emulator.pid"
+          export ANDROID_SERIAL=emulator-5554
+          timeout 20s adb start-server || { cat "$RUNNER_TEMP/emulator.log" || true; echo "::error::ADB server did not start within 20 seconds"; exit 1; }
+
+          dump_diagnostics() {
+            echo "---- emulator process ----"
+            ps -fp "$EMULATOR_PID" || true
+            echo "---- emulator output ----"
+            cat "$RUNNER_TEMP/emulator.log" || true
+            echo "---- adb devices ----"
+            timeout 10s adb devices -l || true
+            timeout 10s adb -s "$ANDROID_SERIAL" shell getprop > "$RUNNER_TEMP/boot-properties.txt" 2>&1 || true
+            timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
+          }
+
+          deadline=$((SECONDS + 1200))
+          until timeout 10s adb -s "$ANDROID_SERIAL" get-state >/dev/null 2>&1; do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              dump_diagnostics
+              echo "::error::Android emulator process exited before ADB became available"
+              exit 1
+            fi
+            if (( SECONDS >= deadline )); then
+              dump_diagnostics
+              echo "::error::ADB device did not become available within 10 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          until [ "$(timeout 10s adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" = "1" ]; do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              dump_diagnostics
+              echo "::error::Android emulator process exited before boot completed"
+              exit 1
+            fi
+            if (( SECONDS >= deadline )); then
+              dump_diagnostics
+              echo "::error::Emulator did not complete boot within 10 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global window_animation_scale 0 || true
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global transition_animation_scale 0 || true
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global animator_duration_scale 0 || true
+          echo "Emulator boot completed."
+
+      - name: Install, launch, and inspect app in emulator
+        shell: bash
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          set -euo pipefail
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          timeout 120s adb -s "$ANDROID_SERIAL" install -r "$APK"
+          timeout 15s adb -s "$ANDROID_SERIAL" shell am force-stop com.cube.channelonly || true
+          timeout 30s adb -s "$ANDROID_SERIAL" shell am start -n com.cube.channelonly/.MainActivity
+          sleep 10
+          PID="$(timeout 10s adb -s "$ANDROID_SERIAL" shell pidof com.cube.channelonly | tr -d '\r' || true)"
+          if [ -z "$PID" ]; then
+            timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt" || true
+            cat "$RUNNER_TEMP/logcat.txt"
+            echo "::error::App process did not remain alive after launch"
+            exit 1
+          fi
+          timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt"
+          if grep -qE 'FATAL EXCEPTION|Process: com[.]cube[.]channelonly' "$RUNNER_TEMP/logcat.txt"; then
+            cat "$RUNNER_TEMP/logcat.txt"
+            echo "::error::Detected an app crash in emulator logcat"
+            exit 1
+          fi
+          echo "Emulator smoke test passed; app process PID: $PID"
+
+      - name: Capture login-screen screenshot
+        if: success()
+        shell: bash
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          set -euo pipefail
+          timeout 15s adb -s "$ANDROID_SERIAL" exec-out screencap -p > "$RUNNER_TEMP/channelonly-login.png"
+          test -s "$RUNNER_TEMP/channelonly-login.png"
+          file "$RUNNER_TEMP/channelonly-login.png"
+
+      - name: Upload login-screen screenshot
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-login-screen
+          path: ${{ runner.temp }}/channelonly-login.png
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload emulator diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-emulator-diagnostics
+          path: |
+            ${{ runner.temp }}/emulator.log
+            ${{ runner.temp }}/emulator.pid
+            ${{ runner.temp }}/boot-properties.txt
+            ${{ runner.temp }}/logcat.txt
+          if-no-files-found: ignore
+          retention-days: 7
+ "$PROJECT_DIR/local.properties" >/dev/null 2>&1; then WEB_CLIENT_CONFIGURED=yes; else WEB_CLIENT_CONFIGURED=no; fi
+          {
+            echo "git_commit=$GITHUB_SHA"
+            echo "package_name=com.cube.channelonly"
+            echo "build_variant=debug"
+            echo "google_web_client_id_configured=$WEB_CLIENT_CONFIGURED"
+            echo "real_account_auth_tested=no"
+          } > "$OUT/build-info.txt"
+          cat "$OUT/build-info.txt"
+
+      - name: Upload debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-debug-apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload OAuth/build metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-oauth-build-metadata
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/validation/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Create and boot a lightweight Android emulator
+        shell: bash
+        env:
+          ANDROID_AVD_HOME: ${{ runner.temp }}/.android/avd
+        run: |
+          set -euo pipefail
+          SDK_ROOT="$ANDROID_SDK_ROOT"
+          mkdir -p "$ANDROID_AVD_HOME"
+          export ANDROID_AVD_HOME
+          AVDMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -path '*/bin/avdmanager' | sort -V | tail -n 1)"
+          test -x "$AVDMANAGER" || { echo "::error::avdmanager executable not found"; exit 1; }
+          printf 'no\n' | "$AVDMANAGER" create avd --force --name channelonly_ci --package "system-images;android-30;google_apis;x86_64" --device pixel_2
+          # Some hosted runner images expose /dev/kvm but omit the runner user from its ACL.
+          # Try granting this ephemeral runner process access before dropping to slow software mode.
+          if [ -c /dev/kvm ] && { [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; }; then
+            sudo setfacl -m "u:$(id -un):rw" /dev/kvm 2>/dev/null || sudo chmod a+rw /dev/kvm 2>/dev/null || true
+          fi
+          if [ -c /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+            EMULATOR_ACCEL_ARGS=(-accel on)
+            echo "KVM is available to the runner; using hardware-accelerated x86_64 emulation."
+          else
+            # Android Emulator requires this opt-in to run the x86_64 guest without KVM.
+            export ANDROID_I_WANT_MY_TCG=yes
+            EMULATOR_ACCEL_ARGS=(-accel off)
+            echo "::warning::KVM remains unavailable; using very slow software CPU emulation."
+          fi
+          nohup "$SDK_ROOT/emulator/emulator" -avd channelonly_ci "${EMULATOR_ACCEL_ARGS[@]}" -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-snapshot-save -camera-back none > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          EMULATOR_PID=$!
+          echo "$EMULATOR_PID" > "$RUNNER_TEMP/emulator.pid"
+          export ANDROID_SERIAL=emulator-5554
+          timeout 20s adb start-server || { cat "$RUNNER_TEMP/emulator.log" || true; echo "::error::ADB server did not start within 20 seconds"; exit 1; }
+
+          dump_diagnostics() {
+            echo "---- emulator process ----"
+            ps -fp "$EMULATOR_PID" || true
+            echo "---- emulator output ----"
+            cat "$RUNNER_TEMP/emulator.log" || true
+            echo "---- adb devices ----"
+            timeout 10s adb devices -l || true
+            timeout 10s adb -s "$ANDROID_SERIAL" shell getprop > "$RUNNER_TEMP/boot-properties.txt" 2>&1 || true
+            timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
+          }
+
+          deadline=$((SECONDS + 1200))
+          until timeout 10s adb -s "$ANDROID_SERIAL" get-state >/dev/null 2>&1; do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              dump_diagnostics
+              echo "::error::Android emulator process exited before ADB became available"
+              exit 1
+            fi
+            if (( SECONDS >= deadline )); then
+              dump_diagnostics
+              echo "::error::ADB device did not become available within 10 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          until [ "$(timeout 10s adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)" = "1" ]; do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              dump_diagnostics
+              echo "::error::Android emulator process exited before boot completed"
+              exit 1
+            fi
+            if (( SECONDS >= deadline )); then
+              dump_diagnostics
+              echo "::error::Emulator did not complete boot within 10 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global window_animation_scale 0 || true
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global transition_animation_scale 0 || true
+          timeout 10s adb -s "$ANDROID_SERIAL" shell settings put global animator_duration_scale 0 || true
+          echo "Emulator boot completed."
+
+      - name: Install, launch, and inspect app in emulator
+        shell: bash
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          set -euo pipefail
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          timeout 120s adb -s "$ANDROID_SERIAL" install -r "$APK"
+          timeout 15s adb -s "$ANDROID_SERIAL" shell am force-stop com.cube.channelonly || true
+          timeout 30s adb -s "$ANDROID_SERIAL" shell am start -n com.cube.channelonly/.MainActivity
+          sleep 10
+          PID="$(timeout 10s adb -s "$ANDROID_SERIAL" shell pidof com.cube.channelonly | tr -d '\r' || true)"
+          if [ -z "$PID" ]; then
+            timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt" || true
+            cat "$RUNNER_TEMP/logcat.txt"
+            echo "::error::App process did not remain alive after launch"
+            exit 1
+          fi
+          timeout 15s adb -s "$ANDROID_SERIAL" logcat -d -t 5000 > "$RUNNER_TEMP/logcat.txt"
+          if grep -qE 'FATAL EXCEPTION|Process: com[.]cube[.]channelonly' "$RUNNER_TEMP/logcat.txt"; then
+            cat "$RUNNER_TEMP/logcat.txt"
+            echo "::error::Detected an app crash in emulator logcat"
+            exit 1
+          fi
+          echo "Emulator smoke test passed; app process PID: $PID"
+
+      - name: Capture login-screen screenshot
+        if: success()
+        shell: bash
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          set -euo pipefail
+          timeout 15s adb -s "$ANDROID_SERIAL" exec-out screencap -p > "$RUNNER_TEMP/channelonly-login.png"
+          test -s "$RUNNER_TEMP/channelonly-login.png"
+          file "$RUNNER_TEMP/channelonly-login.png"
+
+      - name: Upload login-screen screenshot
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-login-screen
+          path: ${{ runner.temp }}/channelonly-login.png
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload emulator diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: channelonly-emulator-diagnostics
+          path: |
+            ${{ runner.temp }}/emulator.log
+            ${{ runner.temp }}/emulator.pid
+            ${{ runner.temp }}/boot-properties.txt
+            ${{ runner.temp }}/logcat.txt
+          if-no-files-found: ignore
+          retention-days: 7
