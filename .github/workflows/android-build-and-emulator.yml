@@ -91,7 +91,15 @@ jobs:
           "$APKSIGNER" verify --verbose "$APK"
           "$APKSIGNER" verify --print-certs "$APK" | tee "$OUT/apk-signing-certificate.txt"
           sha256sum "$APK" | tee "$OUT/apk-sha256.txt"
-          if grep -E '^googleWebClientId=[0-9]+-[A-Za-z0-9_-]+[.]apps[.]googleusercontent[.]com
+          if grep -E '^googleWebClientId=[0-9]+-[A-Za-z0-9_-]+[.]apps[.]googleusercontent[.]com$' "$PROJECT_DIR/local.properties" >/dev/null 2>&1; then WEB_CLIENT_CONFIGURED=yes; else WEB_CLIENT_CONFIGURED=no; fi
+          {
+            echo "git_commit=$GITHUB_SHA"
+            echo "package_name=com.cube.channelonly"
+            echo "build_variant=debug"
+            echo "google_web_client_id_configured=$WEB_CLIENT_CONFIGURED"
+            echo "real_account_auth_tested=no"
+          } > "$OUT/build-info.txt"
+          cat "$OUT/build-info.txt"
       - name: Create and boot a lightweight Android emulator
         shell: bash
         env:
