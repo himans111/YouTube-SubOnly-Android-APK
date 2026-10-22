@@ -40,14 +40,17 @@ internal fun describeYouTubeApiError(statusCode: Int, reason: String?, apiMessag
     }
 }
 
-/** YouTube Data API client. All calls are authenticated with the current user's OAuth access token. */
-class YouTubeApi {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(45, TimeUnit.SECONDS)
-        .build()
+private fun defaultYouTubeHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    .connectTimeout(20, TimeUnit.SECONDS)
+    .readTimeout(30, TimeUnit.SECONDS)
+    .callTimeout(45, TimeUnit.SECONDS)
+    .build()
 
+/** YouTube Data API client. All calls are authenticated with the current user's OAuth access token. */
+class YouTubeApi(
+    private val baseUrl: HttpUrl = HttpUrl.Builder().scheme("https").host(API_HOST).build(),
+    private val client: OkHttpClient = defaultYouTubeHttpClient()
+) {
     private suspend fun request(
         token: String,
         path: String,
@@ -56,9 +59,7 @@ class YouTubeApi {
         body: JSONObject? = null
     ): JSONObject = withContext(Dispatchers.IO) {
         if (token.isBlank()) throw IOException("YouTube account is not connected. Connect it again.")
-        val url = HttpUrl.Builder()
-            .scheme("https")
-            .host(API_HOST)
+        val url = baseUrl.newBuilder()
             .addPathSegments("youtube/v3/$path")
             .apply { params.forEach { (key, value) -> addQueryParameter(key, value) } }
             .build()
