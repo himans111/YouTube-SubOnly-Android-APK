@@ -780,16 +780,6 @@ private fun LinearLoading() {
     }
 }
 
-private suspend fun firebaseTaskMessage(task: Task<*>): String = suspendCancellableCoroutine { cont ->
-    task.addOnCompleteListener { completed ->
-        if (cont.isActive) {
-            val result = if (completed.isSuccessful) "Success"
-            else completed.exception?.localizedMessage ?: "Request failed"
-            cont.resume(result)
-        }
-    }
-}
-
 private fun openYouTube(video: YTVideo, activityContext: android.content.Context) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${video.videoId}"))
     try { activityContext.startActivity(intent) }
