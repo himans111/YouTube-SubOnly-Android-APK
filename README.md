@@ -20,7 +20,7 @@ Read **[SETUP_HINDI.md](SETUP_HINDI.md)** for the full Hindi walkthrough, includ
 
 1. Create a Firebase project, register Android package `com.cube.channelonly`, enable Email/Password and Google under Firebase Authentication → Sign-in method, and copy the app's Firebase values into a local `local.properties` file.
 2. In Google Cloud, create a **Web application OAuth client ID** and set `googleWebClientId=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com` in `local.properties`. Also configure the Android OAuth client for `com.cube.channelonly` and your debug signing SHA-1. Add your account as a test user if the consent screen is in testing mode.
-3. Enable YouTube Data API v3 in Google Cloud. YouTube authorization remains a distinct in-app step after signing in to ChannelOnly.
+3. Enable YouTube Data API v3 in Google Cloud. When signing in with Google, ChannelOnly requests YouTube authorization for the same selected account; Google may show a separate consent screen the first time because YouTube data access is distinct from app sign-in. Later app launches silently try to reacquire a previously granted YouTube token. Email/password users can connect YouTube from the in-app connect screen.
 4. For embedded playback/PiP, publish `player-origin-site/` to a real HTTPS origin you control and set `playerOrigin=https://your-real-origin.example` in `local.properties`. Do not keep the example domain.
 5. Build and test from the project root:
 
