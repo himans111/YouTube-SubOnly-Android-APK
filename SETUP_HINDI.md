@@ -9,6 +9,7 @@
 3. **Google Auth Platform → Branding** में ऐप का नाम और आवश्यक संपर्क जानकारी भरें। अगर Consent/Audience Testing mode में है, तो अपने Google खाते को Test users में जोड़ें।
 4. **Google Auth Platform → Clients** या **APIs & Services → Credentials** में **Create OAuth client ID → Android** चुनें।
 5. Package name बिल्कुल `com.cube.channelonly` रखें। SHA-1 fingerprint उसी APK के signing certificate का होना चाहिए जिसे फोन में इंस्टॉल कर रहे हैं.
+   - **इस final Run #43 APK का exact SHA-1:** `25:C9:62:9A:18:5A:E3:41:08:19:65:BE:D7:06:9C:B3:E8:5A:8C:D9`। यह केवल इसी APK के certificate के लिए है; दूसरे build या Play Store APK की fingerprint अलग हो सकती है.
    - कंप्यूटर पर Android SDK उपलब्ध है तो APK की signing SHA-1 इस कमांड से देखें:
 
         apksigner verify --print-certs app-debug.apk
