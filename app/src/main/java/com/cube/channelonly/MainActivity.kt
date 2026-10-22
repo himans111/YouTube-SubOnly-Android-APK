@@ -1,6 +1,7 @@
 package com.cube.channelonly
 
 import android.app.Activity
+import android.accounts.Account
 import android.app.PictureInPictureParams
 import android.content.res.Configuration
 import android.content.Intent
@@ -303,9 +304,12 @@ class MainActivity : ComponentActivity() {
         authorizationInProgress = true
         authorizationMessage = ""
 
-        val request = AuthorizationRequest.builder()
+        val authorizationBuilder = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(YOUTUBE_SCOPE)))
-            .build()
+        signedInGoogleEmail?.takeIf { it.isNotBlank() }?.let { email ->
+            authorizationBuilder.setAccount(Account(email, "com.google"))
+        }
+        val request = authorizationBuilder.build()
 
         authorizationClient.authorize(request)
             .addOnSuccessListener { result ->
