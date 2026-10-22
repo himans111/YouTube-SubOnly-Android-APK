@@ -47,3 +47,6 @@ Remove Firebase entirely and make Continue with Google use Android Authorization
 Fix the stale Firebase Task helper discovered by direct-OAuth compilation; rerun unit tests, debug APK build, emulator launch, and screenshot capture.
 
 Show a specific Google Cloud Android OAuth package/SHA-1 setup hint for status code 10 or caller-not-whitelisted errors; validate this message with unit tests, APK build, emulator launch, and screenshot.
+
+
+Final validation: sign in using Credential Manager first, pin YouTube authorization to the selected Google account, require a user-provided Web OAuth client ID, test its format, make CI trigger on app/config changes, and publish the exact APK signer fingerprint/SHA-256. Emulator checks do not represent a live Google account test.
