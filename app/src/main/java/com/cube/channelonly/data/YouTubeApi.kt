@@ -22,6 +22,24 @@ internal class YouTubeApiException(
     message: String
 ) : IOException(message)
 
+/** Converts YouTube API failures into a next-step hint users can act on. */
+internal fun describeYouTubeApiError(statusCode: Int, reason: String?, apiMessage: String): String {
+    val detail = apiMessage.ifBlank { "HTTP $statusCode" }
+    return when {
+        statusCode == 401 ->
+            "YouTube authorization expired or was rejected. Reconnect YouTube with Google, then retry. ($detail)"
+        reason in setOf("accessNotConfigured", "SERVICE_DISABLED") ->
+            "YouTube Data API v3 is not enabled for the Google Cloud project used by this app. ($detail)"
+        reason in setOf("quotaExceeded", "dailyLimitExceeded", "rateLimitExceeded", "userRateLimitExceeded") ->
+            "YouTube Data API quota or rate limit was reached. Check the Google Cloud quota and try again later. ($detail)"
+        reason == "insufficientPermissions" ->
+            "The selected Google account has not granted the required YouTube permission. Tap Continue with Google and approve access. ($detail)"
+        statusCode == 403 ->
+            "Google denied the YouTube API request. Check OAuth consent, the granted permission, and API quota/settings. ($detail)"
+        else -> "YouTube API error (HTTP $statusCode): $detail"
+    }
+}
+
 /** YouTube Data API client. All calls are authenticated with the current user's OAuth access token. */
 class YouTubeApi {
     private val client = OkHttpClient.Builder()
@@ -63,11 +81,10 @@ class YouTubeApi {
                 } catch (_: Exception) { null }
                 val apiMessage = error?.optString("message").orEmpty()
                 val reason = error?.optJSONArray("errors")?.optJSONObject(0)?.optString("reason")
-                val detail = if (apiMessage.isNotBlank()) apiMessage else "HTTP ${response.code}"
                 throw YouTubeApiException(
                     statusCode = response.code,
                     reason = reason,
-                    message = "YouTube API error: $detail. Check permissions, API enablement, and quota."
+                    message = describeYouTubeApiError(response.code, reason, apiMessage)
                 )
             }
             if (responseText.isBlank()) JSONObject() else JSONObject(responseText)
