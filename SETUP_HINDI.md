@@ -29,7 +29,7 @@
         ./gradlew signingReport
 
    अगर checkout में Gradle wrapper उपलब्ध न हो, तो installed Gradle से gradle signingReport चलाएँ या Android Studio के Gradle task panel में signingReport चुनें।
-4. Login स्क्रीन पर email/password या **Continue with Google** में से किसी एक से ChannelOnly account में sign-in करें। Google sign-in के लिए Firebase Google provider enabled और `googleWebClientId` सही होना चाहिए। इसके बाद Connect YouTube with Google दबाएँ और YouTube permission स्वीकार करें। App में अपना Google password कभी न लिखें।
+4. Login स्क्रीन पर email/password या **Continue with Google** में से किसी एक से ChannelOnly account में sign-in करें। Google sign-in के लिए Firebase Google provider enabled और `googleWebClientId` सही होना चाहिए। Google से sign-in चुनने पर app उसी चुने हुए Google खाते से YouTube permission की request करेगा; पहली बार consent स्वीकार करना होगा। बाद में ऐप पहले से दी गई अनुमति पाने की कोशिश करेगा, जिससे हर बार password या account selection की जरूरत नहीं होनी चाहिए। Email/password login के लिए YouTube जोड़ने हेतु app का **Connect YouTube with Google** बटन इस्तेमाल करें। App में अपना Google password कभी न लिखें।
 5. Home feed, channel search और subscribe/unsubscribe को वास्तविक account के साथ जाँचें। API quota, Google consent और account-level restrictions की वजह से requests फिर भी fail हो सकती हैं।
 
 ## 3. Embedded player और Picture-in-Picture (PiP)
