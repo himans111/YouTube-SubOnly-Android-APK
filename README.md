@@ -4,11 +4,12 @@ ChannelOnly is an Android app starter for a focused YouTube experience: its in-a
 
 ## Login model
 
-- The app uses Google's official Android authorization flow directly for YouTube access. There is no Firebase login and no separate ChannelOnly account.
-- Tap **Continue with Google**, choose the Google account used for YouTube, and approve the requested YouTube permission on first use.
-- Google may show an account picker or consent screen on first use. On later launches, the app silently tries to reacquire a previously granted YouTube access token. A prompt may return if consent has been revoked or the account requires re-authentication.
-- The app never asks for a Google password and does not read Gmail.
-- A Google Cloud OAuth Android client and YouTube Data API v3 configuration are still required. This is Google's standard authorization registration, not a Firebase setup.
+- Google sign-in uses Android Credential Manager and Google's official Sign in with Google flow. The selected account email is kept locally for display and to pin YouTube authorization to that same account.
+- The app then requests the YouTube Data API scope separately with Android AuthorizationClient. An authorization token alone does not identify the account, so the app does not treat a token by itself as proof of same-account sign-in.
+- There is no Firebase Authentication, Firebase project, or separate ChannelOnly account.
+- The app never asks for a Google password, does not read Gmail, and does not store Google ID/access tokens in app preferences.
+- Setup requires a Google Cloud Web application OAuth client ID in root `local.properties` as `googleWebClientId=...`, an Android OAuth client for package `com.cube.channelonly` with the exact installed APK signing SHA-1, and YouTube Data API v3 enabled. These are OAuth registrations, not Firebase credentials.
+- At app startup, the app tries to reacquire the existing YouTube grant only if the previously selected Google account is known. If access is missing or was revoked, tap Continue with Google again.
 
 ## Included
 
@@ -25,8 +26,10 @@ Read **[SETUP_HINDI.md](SETUP_HINDI.md)** for the full Hindi walkthrough.
 
 1. In Google Cloud Console, create or select a project and enable **YouTube Data API v3**.
 2. Configure the OAuth consent screen. If the app is in Testing mode, add your Google account as a test user.
-3. Create an **OAuth client ID → Android** using package `com.cube.channelonly` and the SHA-1 signing-certificate fingerprint of the APK you install. For a debug APK, the SHA-1 can be read using the Android SDK's `apksigner verify --print-certs app-debug.apk`. A Play Store release needs the corresponding release/App Signing certificate.
-4. Install the APK and tap **Continue with Google**. Google will select the account and request YouTube access when needed.
+3. Create **OAuth client ID → Web application** in the same Cloud project. Add the actual Web Client ID to the project's untracked root `local.properties` as `googleWebClientId=YOUR_REAL_WEB_CLIENT_ID.apps.googleusercontent.com`. The ID is not a secret; do not put a client secret in an Android app.
+4. Create **OAuth client ID → Android** with package `com.cube.channelonly` and the SHA-1 certificate fingerprint of the exact APK you install. Use `apksigner verify --print-certs app-debug.apk`, or the fingerprint in that build's `channelonly-oauth-build-metadata` CI artifact. Do not reuse a fingerprint from a different CI build or Play Store APK.
+5. Enable **YouTube Data API v3**, finish the consent configuration, and add your account as a test user if the OAuth app is in Testing mode.
+6. Rebuild/install the APK and tap **Continue with Google**. Credential Manager selects the Google account first; the app then requests YouTube access with that account explicitly selected.
 5. For embedded playback/PiP, publish `player-origin-site/` to an HTTPS origin you control and set `playerOrigin=https://your-real-origin.example` in local `local.properties`. Otherwise the app opens the video in YouTube.
 
 ## Build and test
