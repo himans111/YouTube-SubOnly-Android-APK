@@ -1,8 +1,5 @@
-# Firebase is not used. Credential Manager needs your Google Cloud Web OAuth Client ID
-# to identify the selected Google account before requesting YouTube API access.
-# Do not use an Android client ID here and never add a client secret.
-googleWebClientId=
-# The YouTube API access token is requested separately using Android AuthorizationClient.
+# Firebase is not used. Google AuthorizationClient handles Google account selection
+# and YouTube API scope consent in one Android OAuth flow.
 # Preserve any existing sdk.dir line created by Android Studio.
 # Configure a Google Cloud OAuth Android client for package com.cube.channelonly
 # and the signing SHA-1 of the APK you install; enable YouTube Data API v3.
