@@ -127,17 +127,27 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         authorizationInProgress = false
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+
+        // Google Identity's authorization result is carried by the returned Intent.
+        // Do not gate extraction on resultCode == RESULT_OK: some successful resolution
+        // flows can return an Intent whose activity result code is not RESULT_OK.
+        // Follow the official Identity API pattern and decode any non-null result Intent.
+        val resultIntent = result.data
+        if (resultIntent != null) {
             try {
-                val authResult = authorizationClient.getAuthorizationResultFromIntent(result.data)
+                val authResult = authorizationClient.getAuthorizationResultFromIntent(resultIntent)
                 acceptYoutubeToken(authResult.accessToken)
             } catch (e: Exception) {
                 authorizationMessage = authorizationErrorMessage(e)
                 youtubeConnectionMessage = authorizationMessage
             }
         } else {
-            authorizationMessage = "Google sign-in or YouTube permission was cancelled. Tap Continue with Google to try again."
-            youtubeConnectionMessage = "YouTube connection was cancelled."
+            authorizationMessage = if (result.resultCode == Activity.RESULT_CANCELED) {
+                "Google authorization returned no result. If you selected an account, check the Android OAuth package/SHA-1 setup and Google Play services, then try again."
+            } else {
+                "Google authorization returned no result (code ${result.resultCode}). Check Google Play services and the Android OAuth setup, then try again."
+            }
+            youtubeConnectionMessage = "YouTube connection was not completed."
         }
     }
 
