@@ -377,7 +377,7 @@ private fun AuthScreen(
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "No Firebase account or Google password is needed inside this app. Google may still show its official account picker or permission screen.",
+                        "No separate app account or Google password is needed inside this app. Google may still show its official account picker or permission screen.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.Center
