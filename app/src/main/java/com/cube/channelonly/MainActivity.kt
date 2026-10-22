@@ -125,14 +125,17 @@ class MainActivity : ComponentActivity() {
     private val authorizationLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
+        authorizationInProgress = false
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
             try {
                 val authResult = authorizationClient.getAuthorizationResultFromIntent(result.data)
                 acceptYoutubeToken(authResult.accessToken)
             } catch (e: Exception) {
-                youtubeConnectionMessage = "YouTube permission was not completed. Try again."
+                authorizationMessage = e.localizedMessage ?: "YouTube permission was not completed. Try again."
+                youtubeConnectionMessage = authorizationMessage
             }
         } else {
+            authorizationMessage = "Google sign-in or YouTube permission was cancelled. Tap Continue with Google to try again."
             youtubeConnectionMessage = "YouTube connection was cancelled."
         }
     }
@@ -289,7 +292,6 @@ class MainActivity : ComponentActivity() {
             youtubeConnectionMessage = "YouTube account connected"
         }
     }
-}
 }
 
 @Composable
