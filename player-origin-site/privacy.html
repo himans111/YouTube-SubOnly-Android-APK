@@ -12,11 +12,11 @@
   <p><strong>Contact:</strong> [SUPPORT EMAIL]</p>
   <p><strong>Last updated:</strong> [DATE]</p>
   <h2>Information processed</h2>
-  <p>Firebase Authentication processes the email address and authentication records needed to secure a ChannelOnly account. If a user separately authorizes YouTube, ChannelOnly reads the user's subscription list and public channel upload metadata to create a channel-filtered feed. If the user asks to subscribe or unsubscribe, ChannelOnly sends that change to the user's YouTube account.</p>
+  <p>When a user chooses to connect a Google account and approves YouTube access, ChannelOnly requests an OAuth access token and reads that account's YouTube subscription list and public channel-upload metadata to create a filtered feed. If the user requests a subscription change, ChannelOnly sends that change to the user's YouTube account. The app does not provide a separate ChannelOnly account and does not read the user's Gmail inbox.</p>
   <h2>How information is used</h2>
-  <p>Information is used to authenticate the user, search for channels on request, display recent uploads from subscribed channel IDs, and execute subscription changes the user explicitly requests.</p>
+  <p>Information is used to obtain the Google-authorized YouTube access needed to display recent uploads from subscribed channel IDs, search for channels on request, and execute subscription changes the user explicitly requests.</p>
   <h2>Storage and sharing</h2>
-  <p>The current starter holds the YouTube access token in app memory and does not deliberately store it to disk. Requests are sent to Google/YouTube API services and Firebase Authentication. Identify any additional services added before release.</p>
+  <p>The current starter holds the YouTube access token in app memory and does not deliberately store it to disk. Authorized API requests are sent to Google/YouTube services. Describe any additional services introduced in a release before publication.</p>
   <h2>User controls</h2>
   <p>Users may disconnect YouTube permissions through ChannelOnly's account screen and/or their Google Account security settings. Account deletion process: [DESCRIBE THE VERIFIED ACCOUNT-DELETION PROCESS AND CONTACT].</p>
   <h2>Children and policy changes</h2>
