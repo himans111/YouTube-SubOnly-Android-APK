@@ -18,7 +18,7 @@
         playerOrigin=
 
    `googleWebClientId` Google Cloud में बने **Web application OAuth client** का Client ID है, Android OAuth Client ID नहीं। Placeholder values को जस का तस छोड़ने पर login configure नहीं होगा।
-6. App rebuild/install करें और email/password login, Google login, sign-out तथा password reset जाँचें। Google login सफल होने के बाद भी YouTube feed के लिए अलग से YouTube permission connect करना होगा।
+6. App rebuild/install करें और email/password login, Google login, sign-out तथा password reset जाँचें। **Continue with Google** से sign-in करने पर ऐप चुने गए उसी Google खाते से YouTube authorization माँगेगा। पहली बार Google को YouTube subscription access की अनुमति देनी पड़ सकती है; यह दूसरा password login नहीं है। आगे ऐप खुलने पर पहले से दी गई YouTube अनुमति को चुपचाप फिर से प्राप्त करने की कोशिश होगी। यदि अनुमति अभी तक नहीं दी गई है, तो ऐप में दिखने वाला **Continue with the same Google account** बटन दबाएँ। Email/Password से sign-in करने वालों के लिए YouTube को अलग से जोड़ने का विकल्प रहेगा। ऐप Gmail inbox को scan नहीं करता।
 
 ## 2. YouTube API और Google authorization
 
