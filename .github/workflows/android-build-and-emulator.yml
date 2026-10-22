@@ -4,6 +4,18 @@ on:
   push:
     paths:
       - 'bootstrap/trigger.txt'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'bootstrap/trigger.txt'
+      - '*.gradle.kts'
+      - 'settings.gradle'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'local.properties.example'
+      - '.github/workflows/android-build-and-emulator.yml'
+      - 'README.md'
+      - 'SETUP_HINDI.md'
   workflow_dispatch:
 
 permissions:
