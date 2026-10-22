@@ -24,7 +24,7 @@
 2. वही Google अकाउंट चुनें जिसका YouTube इस्तेमाल करते हैं।
 3. पहली बार Google YouTube access की अनुमति माँग सकता है। अनुमति स्क्रीन में दिखाई गई subscription permissions पढ़कर स्वीकार करें।
 4. अनुमति सफल होने पर ऐप आपके YouTube subscriptions लोड करेगा। Home feed केवल उन्हीं सब्सक्राइब किए चैनलों के हाल के वीडियो दिखाने के लिए फ़िल्टर करता है।
-5. ऐप बंद करके दोबारा खोलने पर यह पहले से मिली अनुमति से access token पाने की कोशिश करता है। यदि Google अनुमति रद्द हो चुकी हो, session expire हुआ हो या फिर पुष्टि जरूरी हो, तो अनुमति दोबारा माँगी जा सकती है।
+5. ऐप बंद करके दोबारा खोलने पर यह पहले से दर्ज Google account के लिए YouTube grant दोबारा पाने की कोशिश करता है। यदि permission उपलब्ध नहीं हो, अनुमति रद्द हो चुकी हो या re-authentication जरूरी हो, तो Continue with Google दबाकर फिर से अनुमति दें।
 6. ऐप Google password नहीं माँगता और Gmail inbox scan नहीं करता। Firebase या अलग ChannelOnly account की जरूरत नहीं है।
 
 ## 3. अगर Google लॉगिन काम न करे
