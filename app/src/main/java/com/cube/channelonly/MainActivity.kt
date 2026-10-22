@@ -1,5 +1,6 @@
 package com.cube.channelonly
 
+import android.accounts.Account
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.res.Configuration
@@ -131,6 +132,15 @@ internal fun isUsablePlayerOrigin(value: String): Boolean {
     }
 }
 
+/** Pin YouTube authorization to the same device account only when the app session is Google-backed. */
+internal fun googleAccountEmailForYoutubeAuthorization(
+    email: String?,
+    providerIds: Collection<String>
+): String? {
+    val validEmail = email?.trim()?.takeIf { it.contains("@") && it.length <= 320 } ?: return null
+    return validEmail.takeIf { providerIds.any { providerId -> providerId == GoogleAuthProvider.PROVIDER_ID } }
+}
+
 class MainActivity : ComponentActivity() {
     private var auth: FirebaseAuth? = null
     private var currentUser by mutableStateOf<FirebaseUser?>(null)
@@ -162,8 +172,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         auth = FirebaseSetup.initialize(this)
+        val existingUser = auth?.currentUser
+        currentUser = existingUser
         auth?.addAuthStateListener { firebaseAuth -> currentUser = firebaseAuth.currentUser }
-        currentUser = auth?.currentUser
         setContent {
             ChannelOnlyTheme {
                 if (currentUser == null) {
@@ -191,6 +202,10 @@ class MainActivity : ComponentActivity() {
                 } else {
                     MainScreen(
                         userEmail = currentUser?.email.orEmpty(),
+                        googleAccountSignedIn = googleAccountEmailForYoutubeAuthorization(
+                            currentUser?.email,
+                            currentUser?.providerData?.map { it.providerId }.orEmpty()
+                        ) != null,
                         token = youtubeToken,
                         connectionMessage = youtubeConnectionMessage,
                         onConnectYoutube = { requestYoutubeAccess() },
@@ -209,6 +224,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+        // On app restart, silently reacquire an existing YouTube grant for the already-signed-in Google account.
+        // If consent is missing, keep the UI prompt; do not unexpectedly launch an account/consent screen.
+        val existingGoogleEmail = googleAccountEmailForYoutubeAuthorization(
+            existingUser?.email,
+            existingUser?.providerData?.map { it.providerId }.orEmpty()
+        )
+        if (existingGoogleEmail != null) {
+            requestYoutubeAccess(preferredAccountEmail = existingGoogleEmail, allowInteractive = false)
         }
     }
 
@@ -300,8 +324,20 @@ class MainActivity : ComponentActivity() {
                         val firebaseCredential = GoogleAuthProvider.getCredential(googleCredential.idToken, null)
                         firebase.signInWithCredential(firebaseCredential).addOnCompleteListener { task ->
                             googleSigningIn = false
-                            googleSignInMessage = if (task.isSuccessful) "" else {
-                                task.exception?.localizedMessage
+                            if (task.isSuccessful) {
+                                googleSignInMessage = "Google account connected. Approve YouTube access if asked."
+                                val signedInUser = task.result?.user
+                                val selectedGoogleEmail = googleAccountEmailForYoutubeAuthorization(
+                                    signedInUser?.email ?: googleCredential.id,
+                                    signedInUser?.providerData?.map { it.providerId }.orEmpty()
+                                        .ifEmpty { listOf(GoogleAuthProvider.PROVIDER_ID) }
+                                )
+                                requestYoutubeAccess(
+                                    preferredAccountEmail = selectedGoogleEmail,
+                                    allowInteractive = true
+                                )
+                            } else {
+                                googleSignInMessage = task.exception?.localizedMessage
                                     ?: "Firebase Google sign-in failed. Check that Google is enabled in Firebase Authentication."
                             }
                         }
@@ -320,13 +356,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestYoutubeAccess() {
-        val request = AuthorizationRequest.builder()
+    private fun requestYoutubeAccess(
+        preferredAccountEmail: String? = googleAccountEmailForYoutubeAuthorization(
+            currentUser?.email,
+            currentUser?.providerData?.map { it.providerId }.orEmpty()
+        ),
+        allowInteractive: Boolean = true
+    ) {
+        val requestBuilder = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(YOUTUBE_SCOPE)))
-            .build()
-        authorizationClient.authorize(request)
+        // Reuse the account selected in Continue with Google, while letting Google show the required consent UI.
+        preferredAccountEmail?.let { email ->
+            requestBuilder.setAccount(Account(email, "com.google"))
+        }
+        authorizationClient.authorize(requestBuilder.build())
             .addOnSuccessListener { result ->
                 if (result.hasResolution()) {
+                    if (!allowInteractive) {
+                        youtubeConnectionMessage = "YouTube permission needs approval. Tap Continue with the same Google account to finish connecting."
+                        return@addOnSuccessListener
+                    }
                     val pendingIntent = result.pendingIntent
                     if (pendingIntent == null) {
                         youtubeConnectionMessage = "Google did not return a permission screen. Try again."
@@ -338,6 +387,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             .addOnFailureListener { error ->
+                youtubeToken = null
                 youtubeConnectionMessage = "Could not connect YouTube: ${error.localizedMessage ?: "try again"}"
             }
     }
@@ -567,6 +617,7 @@ private enum class MainTab { HOME, SEARCH, SUBSCRIPTIONS }
 @Composable
 private fun MainScreen(
     userEmail: String,
+    googleAccountSignedIn: Boolean,
     token: String?,
     connectionMessage: String,
     onConnectYoutube: () -> Unit,
@@ -663,11 +714,24 @@ private fun MainScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (token == null) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Connect your YouTube account", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (googleAccountSignedIn) "Finish connecting YouTube" else "Connect your YouTube account",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(Modifier.height(8.dp))
-                    Text("Your email login is separate. Google will ask for permission to read and update your YouTube subscriptions.", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (googleAccountSignedIn) {
+                            "You're already signed in with Google. We'll use the same account; you only need to approve YouTube access if it hasn't been granted yet."
+                        } else {
+                            "Email/password sign-in is separate. Connect the Google account you use for YouTube and approve the requested subscription permissions."
+                        },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = onConnectYoutube) { Text("Connect YouTube with Google") }
+                    Button(onClick = onConnectYoutube) {
+                        Text(if (googleAccountSignedIn) "Continue with the same Google account" else "Connect YouTube with Google")
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text(connectionMessage, style = MaterialTheme.typography.bodySmall)
                 }
