@@ -5,7 +5,7 @@
 - Repository: https://github.com/himans111/YouTube-SubOnly-Android-APK
 - Latest completed full validation: [GitHub Actions run #39](https://github.com/himans111/YouTube-SubOnly-Android-APK/actions/runs/39688775159), source/trigger commit `b3b6381bdebca29634ad8d169c47f9bde7bbf353`.
 - Passed: source validation, all Gradle unit tests, debug APK assembly, emulator creation/boot, APK installation, activity launch, app-process/crash-log inspection, and login-screen screenshot capture/upload.
-- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12386469673`; downloaded APK size 20,522,850 bytes and SHA-256 `b5e4e933d35e346b7f031871783ee9a19a614ac723d53ac8cf4682b89533e621`.
+- Latest APK artifact: `channelonly-debug-apk`, artifact ID `12386469673`; downloaded APK size 20,522,376 bytes (verified in the extracted artifact) and SHA-256 `b5e4e933d35e346b7f031871783ee9a19a614ac723d53ac8cf4682b89533e621`.
 - Latest login screenshot artifact: `channelonly-login-screen`, artifact ID `12388490045`; PNG dimensions 1080 × 1920.
 - Login UI: email/password sign-in, account creation, password reset, and Continue with Google via Android Credential Manager → Firebase Google ID-token sign-in.
 - Shared HTTPS player-origin validation now gates both embedded playback and PiP eligibility; new unit tests cover valid origins and reject blank, insecure, placeholder, or path/query/fragment-containing origins.
