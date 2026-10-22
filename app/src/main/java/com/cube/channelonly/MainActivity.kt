@@ -1,6 +1,7 @@
 package com.cube.channelonly
 
 import android.app.Activity
+import android.accounts.Account
 import android.app.PictureInPictureParams
 import android.content.res.Configuration
 import android.content.Intent
@@ -12,6 +13,11 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.lifecycle.lifecycleScope
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
@@ -84,6 +90,8 @@ import com.cube.channelonly.data.YTVideo
 import com.cube.channelonly.data.YouTubeApi
 import com.cube.channelonly.ui.ChannelOnlyTheme
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
 import com.google.android.gms.common.api.ApiException
@@ -91,6 +99,8 @@ import com.google.android.gms.common.api.Scope
 import kotlinx.coroutines.launch
 
 private const val YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
+private const val IDENTITY_PREFS = "channelonly_identity"
+private const val GOOGLE_EMAIL_KEY = "google_account_email"
 
 /** One shared origin check keeps embedded playback and PiP eligibility consistent. */
 internal fun isUsablePlayerOrigin(value: String): Boolean {
@@ -114,8 +124,17 @@ internal fun isUsablePlayerOrigin(value: String): Boolean {
     }
 }
 
+internal fun isConfiguredGoogleWebClientId(value: String): Boolean {
+    val clientId = value.trim()
+    return Regex("^[0-9]+-[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com$").matches(clientId) &&
+        !clientId.contains("YOUR_CLIENT_ID", ignoreCase = true) &&
+        !clientId.contains("REPLACE", ignoreCase = true)
+}
+
 class MainActivity : ComponentActivity() {
+    private var signedInGoogleEmail by mutableStateOf<String?>(null)
     private var youtubeToken by mutableStateOf<String?>(null)
+    private val credentialManager by lazy { CredentialManager.create(this) }
     private var youtubeConnectionMessage by mutableStateOf("YouTube not connected")
     private var authorizationMessage by mutableStateOf("")
     private var authorizationInProgress by mutableStateOf(false)
@@ -144,18 +163,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        signedInGoogleEmail = getSharedPreferences(IDENTITY_PREFS, MODE_PRIVATE)
+            .getString(GOOGLE_EMAIL_KEY, null)
         setContent {
             ChannelOnlyTheme {
                 if (youtubeToken == null) {
                     AuthScreen(
                         isConnecting = authorizationInProgress,
                         message = authorizationMessage,
-                        onContinueWithGoogle = { requestYoutubeAccess(allowInteractive = true) }
+                        onContinueWithGoogle = { signInWithGoogle() }
                     )
                 } else {
                     MainScreen(
-                        userEmail = "Google/YouTube account connected",
-                        googleAccountSignedIn = true,
+                        userEmail = signedInGoogleEmail ?: "Google account signed in",
+                        googleAccountSignedIn = signedInGoogleEmail != null,
                         token = youtubeToken,
                         connectionMessage = youtubeConnectionMessage,
                         onConnectYoutube = { requestYoutubeAccess(allowInteractive = true) },
@@ -174,9 +195,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // If a previous YouTube grant exists, Google can return an access token without opening consent UI.
-        // If first-time consent is needed, this silent attempt leaves the user on the one-button Google login screen.
-        requestYoutubeAccess(allowInteractive = false)
+        // AuthorizationClient returns a token, not user identity. Only restore a grant
+        // after this app has recorded the account selected through Credential Manager.
+        if (!signedInGoogleEmail.isNullOrBlank()) {
+            requestYoutubeAccess(allowInteractive = false)
+        }
     }
 
     private fun isConfiguredPlayerOrigin(): Boolean =
@@ -221,14 +244,72 @@ class MainActivity : ComponentActivity() {
         inPipMode = isInPictureInPictureMode
     }
 
+    private fun signInWithGoogle() {
+        if (authorizationInProgress) return
+        val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID.trim()
+        if (!isConfiguredGoogleWebClientId(webClientId)) {
+            authorizationMessage = "Google sign-in setup needed: create a Web application OAuth client in your Google Cloud project and set googleWebClientId in local.properties. Do not use an Android client ID or add a client secret. See SETUP_HINDI.md."
+            return
+        }
+
+        authorizationInProgress = true
+        authorizationMessage = ""
+        lifecycleScope.launch {
+            try {
+                val option = GetSignInWithGoogleOption.Builder(webClientId).build()
+                val signInRequest = GetCredentialRequest.Builder()
+                    .addCredentialOption(option)
+                    .build()
+                val result = credentialManager.getCredential(
+                    context = this@MainActivity,
+                    request = signInRequest
+                )
+                val credential = result.credential
+                if (credential !is CustomCredential ||
+                    credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                ) {
+                    throw IllegalStateException("Google did not return a valid Google sign-in credential.")
+                }
+
+                val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                val selectedEmail = googleCredential.id.trim()
+                if (selectedEmail.isBlank()) {
+                    throw IllegalStateException("Google sign-in did not provide an account identifier.")
+                }
+
+                // Store only the display identity, never the ID token. Credential Manager sets
+                // the app's default Google account; the following AuthorizationClient request
+                // therefore asks YouTube access for the account the user just selected.
+                signedInGoogleEmail = selectedEmail
+                getSharedPreferences(IDENTITY_PREFS, MODE_PRIVATE).edit()
+                    .putString(GOOGLE_EMAIL_KEY, selectedEmail)
+                    .apply()
+                authorizationInProgress = false
+                requestYoutubeAccess(allowInteractive = true)
+            } catch (e: Exception) {
+                authorizationInProgress = false
+                val detail = e.localizedMessage.orEmpty()
+                authorizationMessage = if (e.javaClass.simpleName.contains("Cancellation", ignoreCase = true)) {
+                    "Google sign-in was cancelled. Tap Continue with Google to try again."
+                } else {
+                    "Google sign-in failed. Check the Web OAuth Client ID, Google Play services, and internet connection." +
+                        if (detail.isNotBlank()) " Details: " + detail else ""
+                }
+            }
+        }
+    }
+
     private fun requestYoutubeAccess(allowInteractive: Boolean = true) {
         if (authorizationInProgress) return
         authorizationInProgress = true
         authorizationMessage = ""
 
-        val request = AuthorizationRequest.builder()
+        val authorizationBuilder = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(YOUTUBE_SCOPE)))
-            .build()
+        signedInGoogleEmail?.takeIf { it.isNotBlank() }?.let { email ->
+            authorizationBuilder.setAccount(Account(email, "com.google"))
+        }
+        val request = authorizationBuilder.build()
 
         authorizationClient.authorize(request)
             .addOnSuccessListener { result ->
@@ -267,7 +348,7 @@ class MainActivity : ComponentActivity() {
         val apiCode = (error as? ApiException)?.statusCode
         val detail = error.localizedMessage.orEmpty()
         return if (apiCode == 10 || detail.contains("whitelisted", ignoreCase = true)) {
-            "Google setup needed: register an Android OAuth client for package com.cube.channelonly and this APK's SHA-1 in Google Cloud, and enable YouTube Data API v3. See SETUP_HINDI.md."
+            "Google setup needed: register an Android OAuth client for package com.cube.channelonly and this APK's SHA-1, create a Web OAuth client and set googleWebClientId in local.properties, and enable YouTube Data API v3. See SETUP_HINDI.md."
         } else {
             "Google/YouTube login failed: ${detail.ifBlank { "check internet and Google Play services, then retry" }}"
         }
@@ -276,6 +357,10 @@ class MainActivity : ComponentActivity() {
     private fun disconnectYoutube() {
         // Return to the Google login screen immediately, then revoke this app's YouTube grant.
         youtubeToken = null
+        signedInGoogleEmail = null
+        getSharedPreferences(IDENTITY_PREFS, MODE_PRIVATE).edit()
+            .remove(GOOGLE_EMAIL_KEY)
+            .apply()
         authorizationMessage = ""
         youtubeConnectionMessage = "YouTube not connected"
         val revokeRequest = RevokeAccessRequest.builder()
@@ -283,10 +368,17 @@ class MainActivity : ComponentActivity() {
             .build()
         authorizationClient.revokeAccess(revokeRequest)
             .addOnCompleteListener { task ->
-                youtubeConnectionMessage = if (task.isSuccessful) {
-                    "YouTube access disconnected"
-                } else {
-                    "Disconnected on this device. If needed, remove ChannelOnly from Google Account security settings."
+                lifecycleScope.launch {
+                    try {
+                        credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                    } catch (_: Exception) {
+                        // Local sign-out remains complete even if provider state cannot be cleared.
+                    }
+                    youtubeConnectionMessage = if (task.isSuccessful) {
+                        "YouTube access disconnected"
+                    } else {
+                        "Disconnected on this device. If needed, remove ChannelOnly from Google Account security settings."
+                    }
                 }
             }
     }
