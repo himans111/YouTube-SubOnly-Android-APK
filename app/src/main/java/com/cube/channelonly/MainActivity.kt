@@ -86,6 +86,7 @@ import com.cube.channelonly.ui.ChannelOnlyTheme
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 import kotlinx.coroutines.launch
 
@@ -131,7 +132,7 @@ class MainActivity : ComponentActivity() {
                 val authResult = authorizationClient.getAuthorizationResultFromIntent(result.data)
                 acceptYoutubeToken(authResult.accessToken)
             } catch (e: Exception) {
-                authorizationMessage = e.localizedMessage ?: "YouTube permission was not completed. Try again."
+                authorizationMessage = authorizationErrorMessage(e)
                 youtubeConnectionMessage = authorizationMessage
             }
         } else {
@@ -258,8 +259,18 @@ class MainActivity : ComponentActivity() {
             }
             .addOnFailureListener { error ->
                 authorizationInProgress = false
-                authorizationMessage = "Google/YouTube login failed: ${error.localizedMessage ?: "check internet and Google Play services, then retry"}"
+                authorizationMessage = authorizationErrorMessage(error)
             }
+    }
+
+    private fun authorizationErrorMessage(error: Exception): String {
+        val apiCode = (error as? ApiException)?.statusCode
+        val detail = error.localizedMessage.orEmpty()
+        return if (apiCode == 10 || detail.contains("whitelisted", ignoreCase = true)) {
+            "Google setup needed: register an Android OAuth client for package com.cube.channelonly and this APK's SHA-1 in Google Cloud, and enable YouTube Data API v3. See SETUP_HINDI.md."
+        } else {
+            "Google/YouTube login failed: ${detail.ifBlank { "check internet and Google Play services, then retry" }}"
+        }
     }
 
     private fun disconnectYoutube() {
